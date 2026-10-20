@@ -1,0 +1,18 @@
+langchain>=1.3.0
+langchain-core>=1.4.9
+langchain-openai>=0.3.35
+langgraph>=0.5.0
+# MultiServerMCPClient: turns the hotel MCP server's tools into LangChain tools.
+langchain-mcp-adapters>=0.1.0
+# Held below 2: the 2.x SDK renamed its APIs and the adapters target 1.x.
+mcp>=1.12.0,<2
+httpx>=0.27.0
+
+fastapi==0.139.0
+uvicorn[standard]==0.47.0
+pydantic==2.13.4
+
+# wrapt locked to 1.x: AM's auto-instrumentation injects
+# opentelemetry-instrumentation-langchain, which needs the 1.x keyword API
+# (see traceloop/openllmetry#4009).
+wrapt==1.17.3

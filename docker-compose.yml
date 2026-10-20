@@ -1,0 +1,18 @@
+# Runs the mock hotel MCP server and the UNMANAGED concierge agent.
+# The managed agent is deployed through Agent Manager instead (see README).
+services:
+  hotel-mcp:
+    build: ./hotel-mcp
+    ports:
+      - "8090:8090"
+
+  concierge-unmanaged:
+    build: ./concierge-agent
+    ports:
+      - "8000:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+      AGENT_LABEL: unmanaged
+      HOTEL_MCP_URL: http://hotel-mcp:8090/mcp
+    depends_on:
+      - hotel-mcp
