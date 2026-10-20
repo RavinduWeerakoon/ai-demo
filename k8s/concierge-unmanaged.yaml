@@ -1,0 +1,100 @@
+# The UNMANAGED concierge: a plain Deployment outside Agent Manager.
+# It holds the raw OpenAI key and calls every hotel MCP tool directly.
+#
+# The MANAGED concierge is not here on purpose: it is the same image, deployed
+# through Agent Manager, which creates its workload, injects LLM_PROVIDER_*,
+# HOTEL_MCP_* and AMP_AGENTID_*, and routes it through the AI gateway.
+#
+# Needs the Secret "concierge-openai" with key OPENAI_API_KEY (see README).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: concierge-unmanaged
+  labels:
+    app.kubernetes.io/name: concierge-unmanaged
+    app.kubernetes.io/part-of: meridian-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: concierge-unmanaged
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: concierge-unmanaged
+        app.kubernetes.io/part-of: meridian-demo
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: concierge
+          image: meridian/concierge-agent:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: AGENT_LABEL
+              value: unmanaged
+            - name: HOTEL_MCP_URL
+              value: http://hotel-mcp:8090/mcp
+            - name: LLM_MODEL
+              value: gpt-4o-mini
+            - name: CORS_ALLOW_ORIGINS
+              value: "*"
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: concierge-openai
+                  key: OPENAI_API_KEY
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+              cpu : "500m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: concierge-unmanaged
+  labels:
+    app.kubernetes.io/name: concierge-unmanaged
+    app.kubernetes.io/part-of: meridian-demo
+spec:
+  selector:
+    app.kubernetes.io/name: concierge-unmanaged
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

@@ -1,0 +1,16 @@
+# kubectl apply -k k8s/
+# Point the images at your registry with:
+#   add newName: <registry>/<image> under each entry below, or with standalone
+#   kustomize: kustomize edit set image meridian/hotel-mcp=<registry>/hotel-mcp:<tag>
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: meridian-demo
+resources:
+  - namespace.yaml
+  - hotel-mcp.yaml
+  - concierge-unmanaged.yaml
+images:
+  - name: meridian/hotel-mcp
+    newTag: 0.1.0
+  - name: meridian/concierge-agent
+    newTag: 0.1.0

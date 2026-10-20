@@ -68,9 +68,50 @@ curl -s localhost:8000/chat -H 'Content-Type: application/json' \
   -d '{"session_id":"demo","message":"I want a refund for HX-48213 please"}'
 ```
 
+## Deploy to Kubernetes
+
+`k8s/` holds the hotel MCP server and the **unmanaged** agent. The managed agent has no manifest here: Agent Manager creates its workload from the same image.
+
+| File | What it creates |
+| --- | --- |
+| `namespace.yaml` | Namespace `meridian-demo` (Pod Security `restricted`) |
+| `hotel-mcp.yaml` | Deployment + Service `hotel-mcp:8090`, 1 replica (state is in memory) |
+| `concierge-unmanaged.yaml` | Deployment + Service `concierge-unmanaged:8000`, OpenAI key from a Secret |
+| `secret.example.yaml` | Template for that Secret (not applied by kustomize) |
+| `kustomization.yaml` | Ties them together; set image names here |
+
+Both pods run as uid 10001, non-root, read-only root filesystem, all capabilities dropped, with `/health` readiness and liveness probes.
+
+1. Build and push the images to a registry the cluster can pull from:
+
+    ```bash
+    docker build -t <registry>/hotel-mcp:0.1.0 hotel-mcp && docker push <registry>/hotel-mcp:0.1.0
+    docker build -t <registry>/concierge-agent:0.1.0 concierge-agent && docker push <registry>/concierge-agent:0.1.0
+    ```
+
+2. Point the manifests at them: in `k8s/kustomization.yaml`, add `newName: <registry>/hotel-mcp` and `newName: <registry>/concierge-agent` under the two `images:` entries. With standalone kustomize the same is `kustomize edit set image meridian/hotel-mcp=<registry>/hotel-mcp:0.1.0` (run in `k8s/`).
+
+3. Apply, then create the OpenAI key Secret:
+
+    ```bash
+    kubectl apply -k k8s/
+    kubectl -n meridian-demo create secret generic concierge-openai --from-literal=OPENAI_API_KEY=sk-...
+    ```
+
+    The agent pod waits in `CreateContainerConfigError` until the Secret exists, then starts on its own.
+
+4. Reach them for the demo (Services are ClusterIP):
+
+    ```bash
+    kubectl -n meridian-demo port-forward svc/concierge-unmanaged 8000:8000
+    kubectl -n meridian-demo port-forward svc/hotel-mcp 8090:8090
+    ```
+
+Reset demo state between runs with `curl -X POST localhost:8090/admin/reset` through the port-forward, or `kubectl -n meridian-demo rollout restart deploy/hotel-mcp`.
+
 ## Deploy the managed side with Agent Manager
 
-1. **Hotel MCP server** must be reachable from the cluster (deploy the `hotel-mcp` image, or expose it).
+1. **Hotel MCP server**: deployed by `k8s/` above. From inside the cluster its upstream URL is `http://hotel-mcp.meridian-demo.svc.cluster.local:8090/mcp`.
 2. **MCP proxy**: create one in front of `.../mcp`, security set to OAuth. Create scopes for the read and staff tools, and put `issue_refund` in its own scope that the concierge agent is not granted.
 3. **LLM provider**: an OpenAI provider with the PII filter guardrail (and content-length / token rate limit if wanted).
 4. **Agent**: deploy `concierge-agent` (run command `python main.py`, port 8000). Attach the LLM provider and the MCP proxy, naming the proxy variables `HOTEL_MCP_URL` / `HOTEL_MCP_API_KEY`. Set `USE_LLM_PROVIDER=true`, `MCP_OAUTH=true`, `AGENT_LABEL=managed`.
