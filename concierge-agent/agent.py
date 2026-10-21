@@ -5,9 +5,10 @@ The same code runs in both demo deployments; only configuration differs.
 - Unmanaged: calls OpenAI directly and the hotel MCP server directly, so every
   tool the server exposes, including ``issue_refund``, is usable.
 - Managed: ``USE_LLM_PROVIDER=true`` routes LLM calls through the Agent Manager
-  LLM provider (where the PII guardrail runs), and ``HOTEL_MCP_URL`` points at
-  the Agent Manager MCP proxy, reached with an AgentID token (``MCP_OAUTH=true``)
-  whose scopes leave out ``issue_refund``.
+  LLM provider (where the prompt decorator and PII masking run), and
+  ``HOTEL_MCP_URL`` points at the Agent Manager MCP proxy, reached with an
+  AgentID token (``MCP_OAUTH=true``) whose scopes leave out
+  ``create_maintenance_ticket``.
 
 The prompt deliberately does not forbid refunds or tell the agent to hide
 personal data: stopping those is the platform's job in this demo, not the
@@ -16,12 +17,10 @@ prompt's.
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import date, timedelta
 from typing import Any
 
-import httpx
 from langchain_core.messages import SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
@@ -114,76 +113,6 @@ def _tool_error(exc: Exception) -> str:
     return f"Tool error: {exc}. This action is not available to you; tell the guest and offer the front desk."
 
 
-def guardrail_intervention(exc: BaseException) -> str | None:
-    """Return the guardrail type if ``exc`` is an Agent Manager guardrail block.
-
-    The gateway answers a blocked LLM call with HTTP 422 and a body like
-    ``{"message": {"action": "GUARDRAIL_INTERVENED", "actionReason": ...},
-    "type": "REGEX_GUARDRAIL"}``. LangChain may wrap the OpenAI error, so walk
-    the exception chain.
-    """
-    seen: BaseException | None = exc
-    while seen is not None:
-        status = getattr(seen, "status_code", None)
-        body = getattr(seen, "body", None)
-        text = f"{body} {seen}"
-        if status == 422 and "GUARDRAIL_INTERVENED" in text:
-            if isinstance(body, dict) and body.get("type"):
-                return str(body["type"])
-            return "GUARDRAIL"
-        seen = seen.__cause__ or seen.__context__
-    return None
-
-
-class GuardrailStatusTransport(httpx.AsyncBaseTransport):
-    """Turns a response-phase guardrail block into the 422 a request-phase block uses.
-
-    A guardrail that blocks the model's *response* does not return an error.
-    The gateway answers HTTP 200 in one of two shapes, depending on whether the
-    upstream reply arrived in one piece or chunked:
-
-    - ``choices: null`` plus its ``message`` / ``type`` intervention fields;
-    - the reply cut short mid-JSON ("stream terminated by policy").
-
-    Either would crash the OpenAI client. Re-issuing it as 422 sends both down
-    the same hand-off path as a request-phase block (``guardrail_intervention``).
-    The gateway sends no Content-Type, so responses are picked by path.
-    """
-
-    def __init__(self) -> None:
-        self._inner = httpx.AsyncHTTPTransport()
-
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        response = await self._inner.handle_async_request(request)
-        if response.status_code != 200 or not request.url.path.endswith("/chat/completions"):
-            return response
-
-        body = await response.aread()
-        # aread() decoded any gzip, so the encoding and length headers no longer apply.
-        headers = [
-            (k, v) for k, v in response.headers.items() if k.lower() not in ("content-encoding", "content-length", "transfer-encoding")
-        ]
-        status, content = 200, body
-        try:
-            data = json.loads(body)
-        except ValueError:
-            log.warning("LLM provider returned a truncated body (%d bytes); treating it as a response guardrail block", len(body))
-            status = 422
-            content = json.dumps(
-                {"message": {"action": "GUARDRAIL_INTERVENED", "actionReason": "Response stopped by a gateway guardrail."}, "type": "RESPONSE_GUARDRAIL"}
-            ).encode()
-        else:
-            if isinstance(data, dict) and data.get("choices") is None and "message" in data:
-                if "GUARDRAIL_INTERVENED" in json.dumps(data.get("message")) or str(data.get("type", "")).upper().endswith("GUARDRAIL"):
-                    status = 422
-        if status == 422:
-            headers = [(k, v) for k, v in headers if k.lower() != "content-type"] + [("content-type", "application/json")]
-        return httpx.Response(status, headers=headers, content=content, request=request, extensions=response.extensions)
-
-    async def aclose(self) -> None:
-        await self._inner.aclose()
-
-
 def build_llm(cfg: Config) -> ChatOpenAI:
     if cfg.use_llm_provider:
         return ChatOpenAI(
@@ -192,7 +121,6 @@ def build_llm(cfg: Config) -> ChatOpenAI:
             base_url=cfg.llm_provider_url,
             api_key="not-used",
             default_headers={"API-Key": cfg.llm_provider_key, "Authorization": ""},
-            http_async_client=httpx.AsyncClient(transport=GuardrailStatusTransport(), timeout=120),
         )
     return ChatOpenAI(model=cfg.model, temperature=0)
 
