@@ -155,3 +155,21 @@ kubectl --context agent-manager-demo -n meridian-demo create secret generic conc
 | "Tell the front desk I need a late checkout. I'm Amaya, room 412, amaya@example.com, card 4111 1111 1111 1111" | Raw email and card go to the LLM and arrive in the MCP log | PII masking redacts them before the LLM |
 
 Rehearse the split refund with the real model. Unmanaged: check it actually splits (the system prompt's "do not retry a failing tool" rule may stop it; if so, narrow that rule). Managed: check it declines and hands off; if it still splits, the decorator text is missing or not attached to the agent's LLM provider.
+
+## Demo website (`web/`)
+
+Next.js 16 (App Router) + shadcn/ui. The banner above the site header switches the concierge chat between the unmanaged and the managed agent; each keeps its own conversation.
+
+Chat messages go through a **server action** (`src/app/actions.ts`), not from the browser: the Next.js server calls the chosen agent's `/chat` with `{message, session_id}` and an `X-API-Key` header, so agent URLs and keys never reach the browser and CORS does not apply. The action validates every input, since server actions can be called directly.
+
+| Variable (`web/.env.local`) | Value |
+| --- | --- |
+| `UNMANAGED_AGENT_URL` | Unmanaged agent's chat URL, e.g. `http://localhost:8000/chat` through `kubectl -n meridian-demo port-forward svc/concierge-unmanaged 8000:8000` |
+| `UNMANAGED_AGENT_API_KEY` | `AGENT_API_KEY` from the `concierge-unmanaged-api-key` Secret |
+| `MANAGED_AGENT_URL` | The Agent Manager agent's chat endpoint URL (ends in `/chat`) |
+| `MANAGED_AGENT_API_KEY` | An API key issued for that agent in Agent Manager (sent as `X-API-Key`, as the console's test chat does) |
+
+```bash
+cd web && cp .env.example .env.local   # then fill it in
+npm install && npm run dev             # http://localhost:3000
+```
