@@ -32,6 +32,7 @@ class Config:
     agentid_token_endpoint: str
     agentid_scopes: str
     cors_allow_origins: list[str]
+    agent_api_key: str
 
     @property
     def agentid_ready(self) -> bool:
@@ -81,4 +82,7 @@ class Config:
             agentid_token_endpoint=_env("AMP_AGENTID_TOKEN_ENDPOINT", ""),
             agentid_scopes=_env("AMP_AGENTID_SCOPES", ""),
             cors_allow_origins=origins,
+            # Optional key callers must send to /chat (X-API-Key or Bearer). For the
+            # unmanaged deployment, which has no gateway in front of it.
+            agent_api_key=_env("AGENT_API_KEY", "").strip(),
         )

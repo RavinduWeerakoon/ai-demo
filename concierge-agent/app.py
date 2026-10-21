@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import secrets
 import uuid
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
@@ -97,10 +98,31 @@ def health() -> dict[str, Any]:
         "mcp_url": CONFIG.mcp_url,
         "mcp_auth": "oauth" if CONFIG.mcp_oauth else ("api-key" if CONFIG.mcp_api_key else "none"),
         "mcp_tools": [t.name for t in RUNTIME.tools],
+        "chat_auth": "api-key" if CONFIG.agent_api_key else "none",
     }
 
 
-@app.post("/chat", response_model=ChatResponse)
+def require_api_key(
+    x_api_key: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+) -> None:
+    """Gate /chat behind AGENT_API_KEY when it is set.
+
+    Accepts ``X-API-Key: <key>`` or ``Authorization: Bearer <key>``. With no
+    AGENT_API_KEY the endpoint stays open, which is right for the managed
+    deployment: there Agent Manager's gateway authenticates callers instead.
+    """
+    expected = CONFIG.agent_api_key
+    if not expected:
+        return
+    supplied = x_api_key
+    if not supplied and authorization and authorization.lower().startswith("bearer "):
+        supplied = authorization[7:].strip()
+    if not supplied or not secrets.compare_digest(supplied.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail="Missing or invalid API key", headers={"WWW-Authenticate": "Bearer"})
+
+
+@app.post("/chat", response_model=ChatResponse, dependencies=[Depends(require_api_key)])
 async def chat(req: ChatRequest) -> ChatResponse:
     session_id = req.session_id or str(uuid.uuid4())
     agent = await RUNTIME.get()

@@ -5,7 +5,9 @@
 # through Agent Manager, which creates its workload, injects LLM_PROVIDER_*,
 # HOTEL_MCP_* and AMP_AGENTID_*, and routes it through the AI gateway.
 #
-# Needs the Secret "concierge-openai" with key OPENAI_API_KEY (see README).
+# Needs two Secrets (see README):
+#   concierge-openai             key OPENAI_API_KEY  (upstream OpenAI key)
+#   concierge-unmanaged-api-key  key AGENT_API_KEY   (key callers send to /chat)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -54,6 +56,14 @@ spec:
                 secretKeyRef:
                   name: concierge-openai
                   key: OPENAI_API_KEY
+            # Callers of /chat must send this as X-API-Key (or Bearer). Required on
+            # purpose: a missing Secret holds the pod back instead of quietly
+            # serving an open endpoint. /health stays open for the probes.
+            - name: AGENT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: concierge-unmanaged-api-key
+                  key: AGENT_API_KEY
           readinessProbe:
             httpGet:
               path: /health

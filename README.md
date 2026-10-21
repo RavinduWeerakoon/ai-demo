@@ -47,6 +47,7 @@ Same code for both deployments. The prompt does not forbid refunds or hide perso
 | `AMP_AGENTID_*` | none | Injected by Agent Manager; used when `MCP_OAUTH=true` |
 | `AGENT_LABEL` | `concierge` | Echoed in `/health` and `/chat` so the site can show which agent answered |
 | `CORS_ALLOW_ORIGINS` | `*` | Origins allowed to call `/chat` from the browser |
+| `AGENT_API_KEY` | none | If set, `/chat` requires it as `X-API-Key: <key>` or `Authorization: Bearer <key>` (401 otherwise). Set it on the unmanaged agent; leave it unset on the managed one, where Agent Manager authenticates callers. `/health` stays open |
 
 `POST /chat` takes `{"message": "...", "session_id": "..."}` and returns `response`, `session_id`, `agent_label` and `tools_used` (tools called this turn, handy for the site). Tool discovery is retried per request, so the agent starts even if the MCP server or AgentID credentials are not ready yet (it answers 503 until they are). A tool call the proxy refuses is returned to the model as an error, and the agent tells the guest it can't do that and offers the front desk.
 
@@ -72,7 +73,7 @@ curl -s localhost:8000/chat -H 'Content-Type: application/json' \
 
 ## Deploy to Kubernetes
 
-`k8s/` holds the hotel MCP server and the **unmanaged** agent. The managed agent has no manifest here: Agent Manager creates its workload from the same image.
+`k8s/base/` holds the hotel MCP server and the **unmanaged** agent; `k8s/overlays/agent-manager-demo/` adapts it to the demo cluster (below). The managed agent has no manifest here: Agent Manager creates its workload from the same image.
 
 | File | What it creates |
 | --- | --- |
@@ -91,12 +92,12 @@ Both pods run as uid 10001, non-root, read-only root filesystem, all capabilitie
     docker build -t <registry>/concierge-agent:0.1.0 concierge-agent && docker push <registry>/concierge-agent:0.1.0
     ```
 
-2. Point the manifests at them: in `k8s/kustomization.yaml`, add `newName: <registry>/hotel-mcp` and `newName: <registry>/concierge-agent` under the two `images:` entries. With standalone kustomize the same is `kustomize edit set image meridian/hotel-mcp=<registry>/hotel-mcp:0.1.0` (run in `k8s/`).
+2. Point the manifests at them: in `k8s/base/kustomization.yaml` (or an overlay), add `newName: <registry>/hotel-mcp` and `newName: <registry>/concierge-agent` under the two `images:` entries. With standalone kustomize the same is `kustomize edit set image meridian/hotel-mcp=<registry>/hotel-mcp:0.1.0` (run in `k8s/base/`).
 
 3. Apply, then create the OpenAI key Secret:
 
     ```bash
-    kubectl apply -k k8s/
+    kubectl apply -k k8s/base
     kubectl -n meridian-demo create secret generic concierge-openai --from-literal=OPENAI_API_KEY=sk-...
     ```
 
@@ -111,9 +112,23 @@ Both pods run as uid 10001, non-root, read-only root filesystem, all capabilitie
 
 Reset demo state between runs with `curl -X POST localhost:8090/admin/reset` through the port-forward, or `kubectl -n meridian-demo rollout restart deploy/hotel-mcp`.
 
+### The agent-manager-demo cluster
+
+`k8s/overlays/agent-manager-demo` is what runs there (namespace `meridian-demo`):
+
+- Images come from the cluster's own registry, `registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/*:0.1.0`. Nodes are amd64, so build with `--platform linux/amd64`. To push from a laptop, port-forward `svc/registry` in `openchoreo-workflow-plane` and push to that port; with colima, reverse-tunnel it into the VM so Docker sees it as `localhost:5000`.
+- An HTTPRoute publishes **only `/mcp`** on the data-plane gateway's HTTPS listener: `https://hotel-mcp.agents.agent-manager.wso2demos.com/mcp`. The certificate is publicly trusted, so the Agent Manager MCP proxy needs no custom CA. `/admin/*` is not routed (it returns 404 publicly) and stays reachable only by port-forward.
+- `/mcp` itself has no auth: anyone who knows the URL can call the mock tools. Demo data only.
+
+```bash
+kubectl --context agent-manager-demo apply -k k8s/overlays/agent-manager-demo
+kubectl --context agent-manager-demo -n meridian-demo create secret generic concierge-openai --from-literal=OPENAI_API_KEY=sk-...
+kubectl --context agent-manager-demo -n meridian-demo create secret generic concierge-unmanaged-api-key --from-literal=AGENT_API_KEY="$(openssl rand -hex 32)"
+```
+
 ## Deploy the managed side with Agent Manager
 
-1. **Hotel MCP server**: deployed by `k8s/` above. From inside the cluster its upstream URL is `http://hotel-mcp.meridian-demo.svc.cluster.local:8090/mcp`.
+1. **Hotel MCP server**: deployed by `k8s/` above. On the demo cluster use the HTTPS upstream `https://hotel-mcp.agents.agent-manager.wso2demos.com/mcp`; elsewhere the in-cluster URL is `http://hotel-mcp.meridian-demo.svc.cluster.local:8090/mcp`.
 2. **MCP proxy**: create one in front of `.../mcp`, security set to OAuth. Create two scopes:
     - `hotel:concierge`: every tool except `create_maintenance_ticket` (including `issue_refund`, so the split refund reaches the guardrail);
     - `hotel:maintenance`: `create_maintenance_ticket` only.

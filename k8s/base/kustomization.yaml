@@ -1,4 +1,4 @@
-# kubectl apply -k k8s/
+# kubectl apply -k k8s/base
 # Point the images at your registry with:
 #   add newName: <registry>/<image> under each entry below, or with standalone
 #   kustomize: kustomize edit set image meridian/hotel-mcp=<registry>/hotel-mcp:<tag>
