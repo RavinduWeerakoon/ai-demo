@@ -112,6 +112,27 @@ def _tool_error(exc: Exception) -> str:
     return f"Tool error: {exc}. This action is not available to you; tell the guest and offer the front desk."
 
 
+def guardrail_intervention(exc: BaseException) -> str | None:
+    """Return the guardrail type if ``exc`` is an Agent Manager guardrail block.
+
+    The gateway answers a blocked LLM call with HTTP 422 and a body like
+    ``{"message": {"action": "GUARDRAIL_INTERVENED", "actionReason": ...},
+    "type": "REGEX_GUARDRAIL"}``. LangChain may wrap the OpenAI error, so walk
+    the exception chain.
+    """
+    seen: BaseException | None = exc
+    while seen is not None:
+        status = getattr(seen, "status_code", None)
+        body = getattr(seen, "body", None)
+        text = f"{body} {seen}"
+        if status == 422 and "GUARDRAIL_INTERVENED" in text:
+            if isinstance(body, dict) and body.get("type"):
+                return str(body["type"])
+            return "GUARDRAIL"
+        seen = seen.__cause__ or seen.__context__
+    return None
+
+
 def build_llm(cfg: Config) -> ChatOpenAI:
     if cfg.use_llm_provider:
         return ChatOpenAI(

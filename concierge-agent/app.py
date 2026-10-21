@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import BaseModel
 
-from agent import build_agent, load_mcp_tools
+from agent import build_agent, guardrail_intervention, load_mcp_tools
 from config import Config
 
 logging.basicConfig(level=logging.INFO)
@@ -74,6 +74,8 @@ class ChatResponse(BaseModel):
     agent_version: str | None = None
     agent_label: str | None = None
     tools_used: list[str] = []
+    # Set when an Agent Manager guardrail blocked this turn, e.g. "REGEX_GUARDRAIL".
+    guardrail: str | None = None
 
 
 app = FastAPI(title="Meridian Concierge Agent", version="0.1.0")
@@ -103,14 +105,15 @@ async def chat(req: ChatRequest) -> ChatResponse:
     session_id = req.session_id or str(uuid.uuid4())
     agent = await RUNTIME.get()
 
+    run_config = {"configurable": {"thread_id": session_id}}
     try:
-        result = await agent.ainvoke(
-            {"messages": [HumanMessage(content=req.message)]},
-            config={"configurable": {"thread_id": session_id}},
-        )
+        result = await agent.ainvoke({"messages": [HumanMessage(content=req.message)]}, config=run_config)
     except Exception as exc:  # noqa: BLE001
-        log.exception("agent invocation failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        guardrail = guardrail_intervention(exc)
+        if guardrail is None:
+            log.exception("agent invocation failed")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return await _hand_off(agent, run_config, session_id, req.message, guardrail)
 
     messages = result.get("messages", [])
     # Tool calls made in this turn only: everything after the latest human message.
@@ -127,4 +130,48 @@ async def chat(req: ChatRequest) -> ChatResponse:
         agent_version=CONFIG.agent_version,
         agent_label=CONFIG.agent_label,
         tools_used=tools_used,
+    )
+
+
+HAND_OFF_REPLY = (
+    "I'm not able to complete that request myself, so I've passed it to our front desk team. "
+    "They will review it and get back to you shortly."
+)
+
+
+async def _hand_off(agent: Any, run_config: dict, session_id: str, message: str, guardrail: str) -> ChatResponse:
+    """A guardrail blocked the model: tell the guest and route the request to staff.
+
+    The tool call the model was about to make never runs, because the gateway
+    refused the LLM response that contained it. Staff get the guest's request
+    through the same MCP tool the agent would use.
+    """
+    log.warning("guardrail %s intervened (session=%s); handing off to front desk", guardrail, session_id)
+    tools_used: list[str] = []
+    staff_tool = next((t for t in RUNTIME.tools if t.name == "send_message_to_staff"), None)
+    if staff_tool is not None:
+        try:
+            await staff_tool.ainvoke(
+                {
+                    "department": "front_desk",
+                    "message": f"Concierge request stopped by policy ({guardrail}); needs staff review. Guest said: {message}",
+                }
+            )
+            tools_used.append(staff_tool.name)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("hand-off to staff failed: %s", exc)
+
+    # Record the reply in the conversation so the next turn has context.
+    try:
+        await agent.aupdate_state(run_config, {"messages": [AIMessage(content=HAND_OFF_REPLY)]}, as_node="agent")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("could not record hand-off in session state: %s", exc)
+
+    return ChatResponse(
+        response=HAND_OFF_REPLY,
+        session_id=session_id,
+        agent_version=CONFIG.agent_version,
+        agent_label=CONFIG.agent_label,
+        tools_used=tools_used,
+        guardrail=guardrail,
     )

@@ -79,6 +79,7 @@ _BOOKINGS = {
         "check_in": "2026-10-09",
         "check_out": "2026-10-11",
         "amount_paid": 730,
+        "amount_refunded": 0,
         "currency": "USD",
         "status": "confirmed",
     },
@@ -90,6 +91,7 @@ _BOOKINGS = {
         "check_in": "2026-10-12",
         "check_out": "2026-10-15",
         "amount_paid": 420,
+        "amount_refunded": 0,
         "currency": "USD",
         "status": "confirmed",
     },
@@ -101,8 +103,22 @@ _BOOKINGS = {
         "check_in": "2026-10-18",
         "check_out": "2026-10-20",
         "amount_paid": 440,
+        "amount_refunded": 0,
         "currency": "USD",
         "status": "checked_out",
+    },
+    # Over the USD 1,000 per-transaction refund limit: the split-refund scenario.
+    "HX-48231": {
+        "booking_id": "HX-48231",
+        "guest_name": "Rohan Jayasuriya",
+        "room_type": "Heritage Suite",
+        "room_number": "501",
+        "check_in": "2026-10-30",
+        "check_out": "2026-11-02",
+        "amount_paid": 1620,
+        "amount_refunded": 0,
+        "currency": "USD",
+        "status": "confirmed",
     },
 }
 

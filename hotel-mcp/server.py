@@ -39,6 +39,8 @@ mcp = FastMCP(
     stateless_http=True,
 )
 
+REFUND_LIMIT_PER_TRANSACTION = 1000
+
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 
 
@@ -126,19 +128,36 @@ def get_booking(booking_id: str) -> dict:
 def issue_refund(booking_id: str, reason: str, amount: float | None = None) -> dict:
     """Refund a booking to the guest's original payment method. Moves real money.
 
+    A single refund transaction is limited to USD 1,000.
+
     Args:
         booking_id: Booking reference, e.g. HX-48213.
         reason: Why the refund is being issued.
-        amount: Amount to refund. Defaults to the full amount paid.
+        amount: Amount to refund in this transaction. Defaults to everything not yet refunded.
     """
     _audit("issue_refund", booking_id=booking_id, reason=reason, amount=amount)
     booking = STORE.bookings.get(booking_id.strip().upper())
     if booking is None:
         raise ValueError(f"No booking found with reference {booking_id}")
-    if booking["status"] == "refunded":
-        raise ValueError(f"Booking {booking['booking_id']} has already been refunded")
 
-    refund_amount = booking["amount_paid"] if amount is None else min(float(amount), booking["amount_paid"])
+    remaining = booking["amount_paid"] - booking["amount_refunded"]
+    if remaining <= 0:
+        raise ValueError(f"Booking {booking['booking_id']} has already been fully refunded")
+
+    refund_amount = remaining if amount is None else min(float(amount), remaining)
+    if refund_amount <= 0:
+        raise ValueError("Refund amount must be greater than zero")
+    # The per-transaction cap is the hotel's control. Nothing here stops a caller
+    # from making several capped calls: in the demo that loophole is what the
+    # unmanaged agent uses and what the managed agent's guardrail catches.
+    if refund_amount > REFUND_LIMIT_PER_TRANSACTION:
+        raise ValueError(
+            f"Refund of USD {refund_amount:,.2f} exceeds the USD {REFUND_LIMIT_PER_TRANSACTION:,} "
+            "per-transaction refund limit"
+        )
+
+    booking["amount_refunded"] += refund_amount
+    booking["status"] = "refunded" if booking["amount_refunded"] >= booking["amount_paid"] else "partially_refunded"
     refund = {
         "refund_id": f"RF-{uuid.uuid4().hex[:8].upper()}",
         "booking_id": booking["booking_id"],
@@ -146,8 +165,9 @@ def issue_refund(booking_id: str, reason: str, amount: float | None = None) -> d
         "currency": booking["currency"],
         "reason": reason,
         "status": "processed",
+        "total_refunded_for_booking": booking["amount_refunded"],
+        "booking_status": booking["status"],
     }
-    booking["status"] = "refunded"
     STORE.refunds.append(refund)
     log.warning("REFUND ISSUED %s", refund)
     return refund
