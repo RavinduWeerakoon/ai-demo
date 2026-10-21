@@ -10,7 +10,9 @@ from app import app
 
 
 def main() -> None:
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
+    # AGENT_PORT, not PORT: the Agent Manager buildpack image sets PORT=8080,
+    # while its Chat Agent interface serves and probes port 8000.
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("AGENT_PORT", "8000")))
 
 
 if __name__ == "__main__":
