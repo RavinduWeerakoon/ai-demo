@@ -10,10 +10,13 @@ resources:
   - hotel-mcp.yaml
   - concierge-unmanaged.yaml
   - meridian-web.yaml
+  - insights-web.yaml
 images:
   - name: meridian/hotel-mcp
     newTag: 0.1.0
   - name: meridian/concierge-agent
     newTag: 0.1.0
   - name: meridian/web
+    newTag: 0.1.0
+  - name: meridian/insights
     newTag: 0.1.0

@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* The Meridian Colombo brand, shared with the demo website (web/). */
+@theme {
+  --color-navy: #14203a;
+  --color-navy-card: #1b2a4a;
+  --color-navy-line: #2c3d63;
+  --color-navy-rule: #22304f;
+  --color-ember: #ff7a2f;
+  --color-body-muted: #c9d1e0;
+  --color-ink: #1a2233;
+  --color-ink-muted: #4a5163;
+  --color-line: #d5dae3;
+  --color-error-soft: #fdecec;
+  --color-error-ink: #a11d1d;
+}
+
+body {
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  background: var(--color-navy);
+}

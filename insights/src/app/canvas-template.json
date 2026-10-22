@@ -1,0 +1,824 @@
+{
+  "dashboards": [
+    {
+      "_id": "6ad6fca8e8a5be38822e200b",
+      "name": "AI Cost & Usage",
+      "dashboard_ids": [],
+      "workspace_ids": [
+        [
+          "6ad9b1b74d991b5f3e566144",
+          "6ad9b81e1c70fd45e7280865",
+          "6ad9b87be8a5be38822e2e60"
+        ],
+        [
+          "6ad9b9d61c70fd45e728086e",
+          "6ad8a13e1c70fd45e728026f"
+        ],
+        [
+          "6ad89faa4d991b5f3e565c0a",
+          "6ad8a03e4d991b5f3e565c0e"
+        ],
+        [
+          "6ad8a0d1e8a5be38822e2912",
+          "6ad8a1aee8a5be38822e2922"
+        ]
+      ],
+      "parent": null,
+      "sort_order": 3,
+      "filters": {
+        "editable": [
+          {
+            "id": "agent",
+            "label": "Agent",
+            "field": "metadata.apiName.raw",
+            "op": "contains",
+            "type": "autocomplete",
+            "multi": true,
+            "default": null
+          }
+        ]
+      }
+    }
+  ],
+  "workspaces": [
+    {
+      "_id": "6ad9b87be8a5be38822e2e60",
+      "type": "events",
+      "name": "Total LLM Requests",
+      "args": "",
+      "es_query": {
+        "post_filter": {
+          "bool": {
+            "should": [
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model.raw"
+                }
+              },
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model"
+                }
+              }
+            ]
+          }
+        },
+        "size": 0,
+        "aggs": {
+          "seg": {
+            "filter": {
+              "bool": {
+                "should": [
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model.raw"
+                    }
+                  },
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model"
+                    }
+                  }
+                ]
+              }
+            },
+            "aggs": {
+              "weight|sum": {
+                "sum": {
+                  "field": "weight",
+                  "missing": 1
+                }
+              }
+            }
+          }
+        },
+        "track_total_hits": false
+      },
+      "dateRange": {
+        "from": "-7d",
+        "to": "now"
+      },
+      "view": "segment",
+      "funnel_query": {},
+      "urlQuery": "?evtcf[filtersGroups][0][filters][0][id]=f0&evtcf[filtersGroups][0][filters][0][field]=metadata.aiMetadata.model.raw&evtcf[filtersGroups][0][filters][0][name]=&evtcf[filtersGroups][0][filters][0][op]=exists&evtcf[filtersGroups][0][filters][0][value]=&seg[metrics][0][metricName]=sum%28events%29&seg[metrics][0][customName]=LLM%20Requests",
+      "viewerFilters": [],
+      "analyticType": "seg",
+      "chartType": "bar",
+      "settings": {
+        "metrics": [
+          {
+            "metricName": "sum(events)",
+            "customName": "LLM Requests"
+          }
+        ],
+        "groups": [],
+        "singleValueSettings": {
+          "chartHeight": 80,
+          "hideLabel": true,
+          "abbreviate": true,
+          "decimals": 0,
+          "trendIndicator": {
+            "isIncreasementGreen": true
+          }
+        }
+      },
+      "width": 1,
+      "height": 1,
+      "tooltip": "LLM calls made through the AI gateway."
+    },
+    {
+      "_id": "6ad9b81e1c70fd45e7280865",
+      "type": "events",
+      "name": "Avg. Cost per Request",
+      "args": "",
+      "es_query": {
+        "post_filter": {
+          "bool": {
+            "should": [
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model.raw"
+                }
+              },
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model"
+                }
+              }
+            ]
+          }
+        },
+        "size": 0,
+        "aggs": {
+          "seg": {
+            "filter": {
+              "bool": {
+                "should": [
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model.raw"
+                    }
+                  },
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model"
+                    }
+                  }
+                ]
+              }
+            },
+            "aggs": {
+              "metadata__aiMetadata__llmCost|weighted_avg": {
+                "weighted_avg": {
+                  "value": {
+                    "field": "metadata.aiMetadata.llmCost"
+                  },
+                  "weight": {
+                    "field": "weight",
+                    "missing": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "track_total_hits": false
+      },
+      "dateRange": {
+        "from": "-7d",
+        "to": "now"
+      },
+      "view": "segment",
+      "funnel_query": {},
+      "urlQuery": "?evtcf[filtersGroups][0][filters][0][id]=f0&evtcf[filtersGroups][0][filters][0][field]=metadata.aiMetadata.model.raw&evtcf[filtersGroups][0][filters][0][name]=&evtcf[filtersGroups][0][filters][0][op]=exists&evtcf[filtersGroups][0][filters][0][value]=&seg[metrics][0][field]=metadata.aiMetadata.llmCost&seg[metrics][0][func]=weighted_avg&seg[metrics][0][customName]=Avg%20cost%20per%20req",
+      "viewerFilters": [],
+      "analyticType": "seg",
+      "chartType": "bar",
+      "settings": {
+        "metrics": [
+          {
+            "field": "metadata.aiMetadata.llmCost",
+            "func": "weighted_avg",
+            "customName": "Avg cost per req"
+          }
+        ],
+        "groups": [],
+        "singleValueSettings": {
+          "chartHeight": 80,
+          "hideLabel": true,
+          "unit": "$",
+          "prefixedUnits": true,
+          "decimals": 4,
+          "trendIndicator": {
+            "isIncreasementGreen": false
+          }
+        }
+      },
+      "width": 1,
+      "height": 1,
+      "tooltip": "Average cost of a single LLM call."
+    },
+    {
+      "_id": "6ad9b1b74d991b5f3e566144",
+      "type": "events",
+      "name": "Total AI Cost Spend",
+      "args": "",
+      "es_query": {
+        "post_filter": {
+          "bool": {
+            "should": [
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model.raw"
+                }
+              },
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model"
+                }
+              }
+            ]
+          }
+        },
+        "size": 0,
+        "aggs": {
+          "seg": {
+            "filter": {
+              "bool": {
+                "should": [
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model.raw"
+                    }
+                  },
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model"
+                    }
+                  }
+                ]
+              }
+            },
+            "aggs": {
+              "metadata__aiMetadata__llmCost|weighted_sum": {
+                "sum": {
+                  "script": {
+                    "field_script": "[metadata.aiMetadata.llmCost]*[weight|1]"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "track_total_hits": false
+      },
+      "dateRange": {
+        "from": "-7d",
+        "to": "now"
+      },
+      "view": "segment",
+      "funnel_query": {},
+      "urlQuery": "?evtcf[filtersGroups][0][filters][0][id]=f0&evtcf[filtersGroups][0][filters][0][field]=metadata.aiMetadata.model.raw&evtcf[filtersGroups][0][filters][0][name]=&evtcf[filtersGroups][0][filters][0][op]=exists&evtcf[filtersGroups][0][filters][0][value]=&seg[metrics][0][field]=metadata.aiMetadata.llmCost&seg[metrics][0][func]=weighted_sum&seg[metrics][0][customName]=Total%20cost%20%28USD%29&seg[chartType]=bar",
+      "width": 1,
+      "height": 1,
+      "viewerFilters": [],
+      "analyticType": "seg",
+      "chartType": "bar",
+      "settings": {
+        "metrics": [
+          {
+            "field": "metadata.aiMetadata.llmCost",
+            "func": "weighted_sum",
+            "customName": "Total cost (USD)"
+          }
+        ],
+        "chartType": "bar",
+        "groups": [],
+        "singleValueSettings": {
+          "chartHeight": 80,
+          "hideLabel": true,
+          "unit": "$",
+          "prefixedUnits": true,
+          "decimals": 4,
+          "trendIndicator": {
+            "isIncreasementGreen": false
+          }
+        }
+      },
+      "tooltip": "What every LLM call through the AI gateway cost in the selected period."
+    },
+    {
+      "_id": "6ad8a0d1e8a5be38822e2912",
+      "type": "events",
+      "name": "Avg Cost per LLM Call",
+      "args": "",
+      "es_query": {
+        "post_filter": {
+          "exists": {
+            "field": "metadata.aiMetadata.llmCost"
+          }
+        },
+        "size": 0,
+        "aggs": {
+          "entTmSrs": {
+            "filter": {
+              "exists": {
+                "field": "metadata.aiMetadata.llmCost"
+              }
+            },
+            "aggs": {
+              "metadata.aiMetadata.model.raw": {
+                "terms": {
+                  "field": "metadata.aiMetadata.model.raw",
+                  "size": 5,
+                  "min_doc_count": 1,
+                  "order": {
+                    "metadata__aiMetadata__llmCost|weighted_avg": "desc"
+                  },
+                  "missing": "(none)"
+                },
+                "aggs": {
+                  "request.time": {
+                    "date_histogram": {
+                      "field": "request.time",
+                      "interval": "1d",
+                      "time_zone": "Asia/Colombo"
+                    },
+                    "aggs": {
+                      "metadata__aiMetadata__llmCost|weighted_avg": {
+                        "weighted_avg": {
+                          "value": {
+                            "field": "metadata.aiMetadata.llmCost"
+                          },
+                          "weight": {
+                            "field": "weight",
+                            "missing": 1
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "metadata__aiMetadata__llmCost|weighted_avg": {
+                    "weighted_avg": {
+                      "value": {
+                        "field": "metadata.aiMetadata.llmCost"
+                      },
+                      "weight": {
+                        "field": "weight",
+                        "missing": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "track_total_hits": false
+      },
+      "dateRange": {
+        "from": "-7d",
+        "to": "now"
+      },
+      "view": "time",
+      "funnel_query": {},
+      "urlQuery": "?evtcf[filtersGroups][0][filters][0][id]=f0&evtcf[filtersGroups][0][filters][1][id]=9c2f05e4&evtcf[filtersGroups][0][filters][1][field]=metadata.aiMetadata.llmCost&evtcf[filtersGroups][0][filters][1][name]=&evtcf[filtersGroups][0][filters][1][op]=exists&evtcf[filtersGroups][0][filters][1][value]=&evt_ts[metrics][0][field]=metadata.aiMetadata.llmCost&evt_ts[metrics][0][func]=weighted_avg&evt_ts[interval]=1d&evt_ts[groups][0][field]=metadata.aiMetadata.model.raw&evt_ts[groups][0][func]=terms&evt_ts[groups][0][by]=metric&evt_ts[chartType]=bar",
+      "width": 1,
+      "viewerFilters": [],
+      "analyticType": "entTmSrs",
+      "chartType": "bar",
+      "settings": {
+        "metrics": [
+          {
+            "field": "metadata.aiMetadata.llmCost",
+            "func": "weighted_avg"
+          }
+        ],
+        "interval": "1d",
+        "groups": [
+          {
+            "field": "metadata.aiMetadata.model.raw",
+            "func": "terms",
+            "by": "metric"
+          }
+        ],
+        "chartType": "bar"
+      },
+      "height": 1,
+      "tooltip": "Average cost of one call per day, for the five most expensive models."
+    },
+    {
+      "_id": "6ad8a13e1c70fd45e728026f",
+      "type": "events",
+      "name": "Model Affinity",
+      "args": "",
+      "es_query": {
+        "post_filter": {
+          "bool": {
+            "should": [
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model.raw"
+                }
+              },
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model"
+                }
+              }
+            ]
+          }
+        },
+        "size": 0,
+        "aggs": {
+          "seg": {
+            "filter": {
+              "bool": {
+                "should": [
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model.raw"
+                    }
+                  },
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model"
+                    }
+                  }
+                ]
+              }
+            },
+            "aggs": {
+              "metadata.aiMetadata.model.raw": {
+                "terms": {
+                  "field": "metadata.aiMetadata.model.raw",
+                  "size": 5,
+                  "min_doc_count": 1,
+                  "order": {
+                    "weight|sum": "desc"
+                  },
+                  "missing": "(none)"
+                },
+                "aggs": {
+                  "weight|sum": {
+                    "sum": {
+                      "field": "weight",
+                      "missing": 1
+                    }
+                  }
+                }
+              },
+              "weight|sum": {
+                "sum": {
+                  "field": "weight",
+                  "missing": 1
+                }
+              }
+            }
+          }
+        },
+        "track_total_hits": false
+      },
+      "dateRange": {
+        "from": "-7d",
+        "to": "now"
+      },
+      "view": "segment",
+      "funnel_query": {},
+      "urlQuery": "?evtcf[filtersGroups][0][filters][0][id]=f0&evtcf[filtersGroups][0][filters][0][field]=metadata.aiMetadata.model.raw&evtcf[filtersGroups][0][filters][0][name]=&evtcf[filtersGroups][0][filters][0][op]=exists&evtcf[filtersGroups][0][filters][0][value]=&seg[groups][0][field]=metadata.aiMetadata.model.raw&seg[groups][0][func]=terms&seg[groups][0][by]=metric&seg[metrics][0][metricName]=sum%28events%29&seg[chartType]=pie",
+      "width": 1,
+      "viewerFilters": [],
+      "analyticType": "seg",
+      "chartType": "pie",
+      "settings": {
+        "groups": [
+          {
+            "field": "metadata.aiMetadata.model.raw",
+            "func": "terms",
+            "by": "metric"
+          }
+        ],
+        "metrics": [
+          {
+            "metricName": "sum(events)"
+          }
+        ],
+        "chartType": "pie"
+      },
+      "height": 1,
+      "tooltip": "Share of LLM calls that went to each model."
+    },
+    {
+      "_id": "6ad8a03e4d991b5f3e565c0e",
+      "type": "events",
+      "name": "Cost by Model",
+      "args": "",
+      "es_query": {
+        "size": 0,
+        "aggs": {
+          "seg": {
+            "filter": {
+              "match_all": {}
+            },
+            "aggs": {
+              "metadata.aiMetadata.model.raw": {
+                "terms": {
+                  "field": "metadata.aiMetadata.model.raw",
+                  "size": "5",
+                  "min_doc_count": 1,
+                  "order": {
+                    "metadata__aiMetadata__llmCost|weighted_sum": "desc"
+                  },
+                  "missing": "(none)"
+                },
+                "aggs": {
+                  "metadata__aiMetadata__llmCost|weighted_sum": {
+                    "sum": {
+                      "script": {
+                        "field_script": "[metadata.aiMetadata.llmCost]*[weight|1]"
+                      }
+                    }
+                  }
+                }
+              },
+              "metadata__aiMetadata__llmCost|weighted_sum": {
+                "sum": {
+                  "script": {
+                    "field_script": "[metadata.aiMetadata.llmCost]*[weight|1]"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "track_total_hits": false
+      },
+      "dateRange": {
+        "from": "-7d",
+        "to": "now"
+      },
+      "view": "segment",
+      "funnel_query": {},
+      "urlQuery": "?seg[groups][0][field]=metadata.aiMetadata.model.raw&seg[groups][0][func]=terms&seg[groups][0][buckets]=5&seg[groups][0][by]=metric&seg[metrics][0][field]=metadata.aiMetadata.llmCost&seg[metrics][0][func]=weighted_sum&seg[metrics][0][customName]=Model%20Cost",
+      "width": 1,
+      "viewerFilters": [],
+      "analyticType": "seg",
+      "chartType": "bar",
+      "settings": {
+        "groups": [
+          {
+            "field": "metadata.aiMetadata.model.raw",
+            "func": "terms",
+            "buckets": "5",
+            "by": "metric"
+          }
+        ],
+        "metrics": [
+          {
+            "field": "metadata.aiMetadata.llmCost",
+            "func": "weighted_sum",
+            "customName": "Model Cost"
+          }
+        ]
+      },
+      "height": 1,
+      "tooltip": "Spend per model, highest first."
+    },
+    {
+      "_id": "6ad9b9d61c70fd45e728086e",
+      "type": "events",
+      "name": "Spend by Model",
+      "args": "",
+      "es_query": {
+        "post_filter": {
+          "bool": {
+            "should": [
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model.raw"
+                }
+              },
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model"
+                }
+              }
+            ]
+          }
+        },
+        "size": 0,
+        "aggs": {
+          "seg": {
+            "filter": {
+              "bool": {
+                "should": [
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model.raw"
+                    }
+                  },
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model"
+                    }
+                  }
+                ]
+              }
+            },
+            "aggs": {
+              "metadata.aiMetadata.model.raw": {
+                "terms": {
+                  "field": "metadata.aiMetadata.model.raw",
+                  "size": 5,
+                  "min_doc_count": 1,
+                  "order": {
+                    "metadata__aiMetadata__llmCost|weighted_sum": "desc"
+                  },
+                  "missing": "(none)"
+                },
+                "aggs": {
+                  "metadata__aiMetadata__llmCost|weighted_sum": {
+                    "sum": {
+                      "script": {
+                        "field_script": "[metadata.aiMetadata.llmCost]*[weight|1]"
+                      }
+                    }
+                  }
+                }
+              },
+              "metadata__aiMetadata__llmCost|weighted_sum": {
+                "sum": {
+                  "script": {
+                    "field_script": "[metadata.aiMetadata.llmCost]*[weight|1]"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "track_total_hits": false
+      },
+      "dateRange": {
+        "from": "-7d",
+        "to": "now"
+      },
+      "view": "segment",
+      "funnel_query": {},
+      "urlQuery": "?evtcf[filtersGroups][0][filters][0][id]=f0&evtcf[filtersGroups][0][filters][0][field]=metadata.aiMetadata.model.raw&evtcf[filtersGroups][0][filters][0][name]=&evtcf[filtersGroups][0][filters][0][op]=exists&evtcf[filtersGroups][0][filters][0][value]=&seg[groups][0][field]=metadata.aiMetadata.model.raw&seg[groups][0][func]=terms&seg[groups][0][by]=metric&seg[metrics][0][field]=metadata.aiMetadata.llmCost&seg[metrics][0][func]=weighted_sum&seg[metrics][0][customName]=Cost%20%28USD%29&seg[chartType]=pie",
+      "viewerFilters": [],
+      "analyticType": "seg",
+      "chartType": "pie",
+      "settings": {
+        "groups": [
+          {
+            "field": "metadata.aiMetadata.model.raw",
+            "func": "terms",
+            "by": "metric"
+          }
+        ],
+        "metrics": [
+          {
+            "field": "metadata.aiMetadata.llmCost",
+            "func": "weighted_sum",
+            "customName": "Cost (USD)"
+          }
+        ],
+        "chartType": "pie"
+      },
+      "width": 1,
+      "height": 1,
+      "tooltip": "Share of the spend that went to each model."
+    },
+    {
+      "_id": "6ad89faa4d991b5f3e565c0a",
+      "type": "events",
+      "name": "Total AI Cost (daily)",
+      "args": "",
+      "es_query": {
+        "size": 0,
+        "aggs": {
+          "entTmSrs": {
+            "filter": {
+              "match_all": {}
+            },
+            "aggs": {
+              "request.time": {
+                "date_histogram": {
+                  "field": "request.time",
+                  "interval": "1d",
+                  "time_zone": "Asia/Colombo"
+                },
+                "aggs": {
+                  "metadata__aiMetadata__llmCost|weighted_sum": {
+                    "sum": {
+                      "script": {
+                        "field_script": "[metadata.aiMetadata.llmCost]*[weight|1]"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "track_total_hits": false
+      },
+      "dateRange": {
+        "from": "-7d",
+        "to": "now"
+      },
+      "view": "time",
+      "funnel_query": {},
+      "urlQuery": "?evt_ts[metrics][0][field]=metadata.aiMetadata.llmCost&evt_ts[metrics][0][func]=weighted_sum&evt_ts[metrics][0][customName]=Total%20LLM%20Cost&evt_ts[interval]=1d&evt_ts[chartType]=bar",
+      "viewerFilters": [],
+      "analyticType": "entTmSrs",
+      "chartType": "bar",
+      "settings": {
+        "metrics": [
+          {
+            "field": "metadata.aiMetadata.llmCost",
+            "func": "weighted_sum",
+            "customName": "Total LLM Cost"
+          }
+        ],
+        "interval": "1d",
+        "chartType": "bar"
+      },
+      "width": 2,
+      "height": 1,
+      "tooltip": "Total LLM spend per day."
+    },
+    {
+      "_id": "6ad8a1aee8a5be38822e2922",
+      "type": "events",
+      "name": "Daily Token Usage",
+      "args": "",
+      "es_query": {
+        "size": 0,
+        "aggs": {
+          "entTmSrs": {
+            "filter": {
+              "match_all": {}
+            },
+            "aggs": {
+              "request.time": {
+                "date_histogram": {
+                  "field": "request.time",
+                  "interval": "1d",
+                  "time_zone": "Asia/Colombo"
+                },
+                "aggs": {
+                  "metadata__aiTokenUsage__promptTokens|weighted_sum": {
+                    "sum": {
+                      "script": {
+                        "field_script": "[metadata.aiTokenUsage.promptTokens]*[weight|1]"
+                      }
+                    }
+                  },
+                  "metadata__aiTokenUsage__completionTokens|weighted_sum": {
+                    "sum": {
+                      "script": {
+                        "field_script": "[metadata.aiTokenUsage.completionTokens]*[weight|1]"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "track_total_hits": false
+      },
+      "dateRange": {
+        "from": "-7d",
+        "to": "now"
+      },
+      "view": "time",
+      "funnel_query": {},
+      "urlQuery": "?evt_ts[metrics][0][field]=metadata.aiTokenUsage.promptTokens&evt_ts[metrics][0][func]=weighted_sum&evt_ts[metrics][0][customName]=Prompt%20Tokens&evt_ts[metrics][1][i]=c2440e92&evt_ts[metrics][1][field]=metadata.aiTokenUsage.completionTokens&evt_ts[metrics][1][func]=weighted_sum&evt_ts[metrics][1][customName]=Completion%20Tokens&evt_ts[interval]=1d&evt_ts[chartType]=bar",
+      "viewerFilters": [],
+      "analyticType": "entTmSrs",
+      "chartType": "bar",
+      "settings": {
+        "metrics": [
+          {
+            "field": "metadata.aiTokenUsage.promptTokens",
+            "func": "weighted_sum",
+            "customName": "Prompt Tokens"
+          },
+          {
+            "i": "c2440e92",
+            "field": "metadata.aiTokenUsage.completionTokens",
+            "func": "weighted_sum",
+            "customName": "Completion Tokens"
+          }
+        ],
+        "interval": "1d",
+        "chartType": "bar"
+      },
+      "width": 2,
+      "height": 1,
+      "tooltip": "Prompt and completion tokens sent through the gateway per day."
+    }
+  ]
+}

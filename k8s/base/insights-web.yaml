@@ -1,0 +1,104 @@
+# The AI Insights dashboard (insights/): the Moesif Canvas dashboard behind the
+# same demo login as the website. The Moesif key stays in the pod until a
+# signed-in visitor opens the page.
+#
+# Secrets it reads (both optional, so the app starts without them):
+#   meridian-web-login   DEMO_USERNAME, DEMO_PASSWORD (the website's demo account)
+#   insights-moesif      MOESIF_CANVAS_KEY (Moesif management key, read access to events only)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insights-web
+  labels:
+    app.kubernetes.io/name: insights-web
+    app.kubernetes.io/part-of: meridian-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: insights-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: insights-web
+        app.kubernetes.io/part-of: meridian-demo
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: meridian/insights:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: DEMO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-web-login
+                  key: DEMO_USERNAME
+                  optional: true
+            - name: DEMO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-web-login
+                  key: DEMO_PASSWORD
+                  optional: true
+            - name: MOESIF_CANVAS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: insights-moesif
+                  key: MOESIF_CANVAS_KEY
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /login
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /login
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 25m
+              memory: 96Mi
+            limits:
+              memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # Next.js writes its image and fetch caches here.
+            - name: next-cache
+              mountPath: /app/.next/cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: next-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insights-web
+  labels:
+    app.kubernetes.io/name: insights-web
+    app.kubernetes.io/part-of: meridian-demo
+spec:
+  selector:
+    app.kubernetes.io/name: insights-web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

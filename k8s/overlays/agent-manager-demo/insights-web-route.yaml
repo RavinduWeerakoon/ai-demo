@@ -1,0 +1,21 @@
+# https://insights.agents.agent-manager.wso2demos.com
+# Covered by the data-plane gateway's wildcard certificate and the wildcard DNS
+# record, so no new certificate or DNS entry is needed.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: insights-web
+  labels:
+    app.kubernetes.io/name: insights-web
+    app.kubernetes.io/part-of: meridian-demo
+spec:
+  parentRefs:
+    - name: gateway-default
+      namespace: openchoreo-data-plane
+      sectionName: https
+  hostnames:
+    - insights.agents.agent-manager.wso2demos.com
+  rules:
+    - backendRefs:
+        - name: insights-web
+          port: 3000

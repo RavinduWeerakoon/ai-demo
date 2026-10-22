@@ -7,6 +7,8 @@ ai-demo/
   hotel-mcp/         Mock hotel MCP server (streamable HTTP, /mcp, port 8090)
   concierge-agent/   LangGraph concierge, POST /chat on port 8000
   docker-compose.yml hotel-mcp + the UNMANAGED agent
+  web/               The hotel website with the concierge chat
+  insights/          AI Insights: the Moesif cost dashboard, a separate app
 ```
 
 ## Hotel MCP server
@@ -197,3 +199,24 @@ kubectl --context agent-manager-demo -n meridian-demo rollout restart deploy/mer
 ```
 
 Until that Secret exists nobody can sign in. Anyone given the password can chat with both agents, and every message is a paid model call, so share it only with the people running the demo.
+
+## AI Insights dashboard (`insights/`)
+
+A separate Next.js app that embeds the Moesif Canvas dashboard of the demo's LLM traffic (cost, model mix, token use), behind the same demo login as the website. On agent-manager-demo it runs as `insights-web` at **https://insights.agents.agent-manager.wso2demos.com**, again covered by the wildcard certificate and DNS. See `insights/README.md` for how the embed works.
+
+| Variable (`insights/.env.local`) | Value |
+| --- | --- |
+| `DEMO_USERNAME` / `DEMO_PASSWORD` | The demo login. On the cluster it reuses the website's `meridian-web-login` Secret |
+| `MOESIF_CANVAS_KEY` | Moesif management API key with read access to events only, without the `Bearer ` prefix. Any signed-in visitor can read it in the browser |
+
+```bash
+cd insights && cp .env.example .env.local   # then fill it in
+npm install && npm run dev                  # http://localhost:3001
+```
+
+On the cluster, build `meridian/insights:<tag>` for linux/amd64 from `insights/Dockerfile`, push it to the in-cluster registry like the other images, then:
+
+```bash
+read -rs "MOESIF_KEY?Moesif key: " && kubectl --context agent-manager-demo -n meridian-demo create secret generic insights-moesif --from-literal=MOESIF_CANVAS_KEY="$MOESIF_KEY"; unset MOESIF_KEY
+kubectl --context agent-manager-demo apply -k k8s/overlays/agent-manager-demo
+```

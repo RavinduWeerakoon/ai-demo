@@ -10,6 +10,7 @@ resources:
   - ../../base
   - hotel-mcp-route.yaml
   - meridian-web-route.yaml
+  - insights-web-route.yaml
 images:
   - name: meridian/hotel-mcp
     newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/hotel-mcp
@@ -20,3 +21,6 @@ images:
   - name: meridian/web
     newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/web
     newTag: 0.1.1
+  - name: meridian/insights
+    newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/insights
+    newTag: 0.1.0
