@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { MessageCircle, Minus, RotateCcw, SendHorizontal, ShieldCheck, TriangleAlert } from "lucide-react";
+import {
+  Maximize2,
+  MessageCircle,
+  Minimize2,
+  Minus,
+  RotateCcw,
+  SendHorizontal,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 
@@ -34,6 +43,17 @@ const SUGGESTIONS = [
 
 const emptyConversation = (): Conversation => ({ sessionId: null, messages: [] });
 
+// Centred size and position for the expanded panel: up to 880 x 820, with at
+// least a 1rem margin to the sides and 2rem to the top and bottom.
+const EXPANDED_WIDTH = "min(880px, calc(100vw - 2rem))";
+const EXPANDED_HEIGHT = "min(820px, calc(100dvh - 4rem))";
+const EXPANDED_STYLE = {
+  width: EXPANDED_WIDTH,
+  height: EXPANDED_HEIGHT,
+  right: `calc((100vw - ${EXPANDED_WIDTH}) / 2)`,
+  bottom: `calc((100dvh - ${EXPANDED_HEIGHT}) / 2)`,
+} as const;
+
 export function ConciergeChat() {
   const { mode } = useAgentMode();
   const [conversations, setConversations] = useState<Record<AgentMode, Conversation>>({
@@ -43,6 +63,8 @@ export function ConciergeChat() {
   const [draft, setDraft] = useState("");
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  // Expanded: the panel moves from the corner to the middle of the page.
+  const [expanded, setExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -53,21 +75,25 @@ export function ConciergeChat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [conversation.messages.length, isPending, open]);
 
-  // Focus the message box when the panel opens; Escape closes it.
+  // Focus the message box when the panel opens. Escape first shrinks an
+  // expanded panel back to the corner, then closes it.
   useEffect(() => {
     if (!open) return;
     inputRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key !== "Escape") return;
+      if (expanded) setExpanded(false);
+      else close();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+  }, [open, expanded]);
 
   // The panel unmounts when closed, but the conversations live here, so
   // minimising and reopening keeps the chat.
   function close() {
     setOpen(false);
+    setExpanded(false);
     requestAnimationFrame(() => launcherRef.current?.focus());
   }
 
@@ -113,6 +139,15 @@ export function ConciergeChat() {
 
   return (
     <>
+      {/* Dims the page behind the expanded panel; clicking it shrinks the panel back. */}
+      <div
+        aria-hidden
+        onClick={() => setExpanded(false)}
+        className={cn(
+          "fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 motion-reduce:transition-none",
+          open && expanded ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      />
       <section
         id="concierge-chat"
         aria-label="Meridian Concierge chat"
@@ -122,9 +157,13 @@ export function ConciergeChat() {
         // Takes the launcher's place in the corner and grows out of it: the
         // scale origin is the launcher's centre, 32px in from the panel's
         // bottom-right corner.
-        style={{ transformOrigin: "calc(100% - 32px) calc(100% - 32px)" }}
+        // When expanded, the corner position is overridden with a centred one.
+        // Size and position animate, so the panel glides to the middle.
+        style={{ transformOrigin: "calc(100% - 32px) calc(100% - 32px)", ...(expanded ? EXPANDED_STYLE : {}) }}
+        aria-modal={expanded || undefined}
+        role={expanded ? "dialog" : undefined}
         className={cn(
-          "fixed right-4 bottom-5 z-50 flex h-[min(660px,calc(100dvh-7rem))] w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-chat-border bg-white text-chat-ink shadow-2xl shadow-black/40 transition-[scale,opacity] duration-300 ease-[cubic-bezier(0.2,0.9,0.3,1.1)] motion-reduce:transition-none sm:right-6",
+          "fixed right-4 bottom-5 z-50 flex h-[min(660px,calc(100dvh-7rem))] w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-chat-border bg-white text-chat-ink shadow-2xl shadow-black/40 transition-[scale,opacity,width,height,right,bottom] duration-300 ease-[cubic-bezier(0.2,0.9,0.3,1.1)] motion-reduce:transition-none sm:right-6",
           open ? "scale-100 opacity-100" : "pointer-events-none scale-0 opacity-0",
         )}
       >
@@ -147,6 +186,17 @@ export function ConciergeChat() {
             disabled={isPending}
           >
             <RotateCcw />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            className="size-11 text-white/75 hover:bg-white/10 hover:text-white"
+            aria-label={expanded ? "Shrink chat back to the corner" : "Expand chat to the centre of the page"}
+            aria-pressed={expanded}
+            title={expanded ? "Shrink" : "Expand"}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? <Minimize2 /> : <Maximize2 />}
           </Button>
           <Button
             variant="ghost"
