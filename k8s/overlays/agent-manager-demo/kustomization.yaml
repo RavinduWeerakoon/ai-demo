@@ -19,4 +19,4 @@ images:
     newTag: 0.1.2
   - name: meridian/web
     newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/web
-    newTag: 0.1.0
+    newTag: 0.1.1
