@@ -91,8 +91,7 @@
               }
             }
           }
-        },
-        "track_total_hits": false
+        }
       },
       "dateRange": {
         "from": "-7d",
@@ -181,8 +180,7 @@
               }
             }
           }
-        },
-        "track_total_hits": false
+        }
       },
       "dateRange": {
         "from": "-7d",
@@ -269,8 +267,7 @@
               }
             }
           }
-        },
-        "track_total_hits": false
+        }
       },
       "dateRange": {
         "from": "-7d",
@@ -373,8 +370,7 @@
               }
             }
           }
-        },
-        "track_total_hits": false
+        }
       },
       "dateRange": {
         "from": "-7d",
@@ -476,8 +472,7 @@
               }
             }
           }
-        },
-        "track_total_hits": false
+        }
       },
       "dateRange": {
         "from": "-7d",
@@ -514,11 +509,40 @@
       "name": "Cost by Model",
       "args": "",
       "es_query": {
+        "post_filter": {
+          "bool": {
+            "should": [
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model.raw"
+                }
+              },
+              {
+                "exists": {
+                  "field": "metadata.aiMetadata.model"
+                }
+              }
+            ]
+          }
+        },
         "size": 0,
         "aggs": {
           "seg": {
             "filter": {
-              "match_all": {}
+              "bool": {
+                "should": [
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model.raw"
+                    }
+                  },
+                  {
+                    "exists": {
+                      "field": "metadata.aiMetadata.model"
+                    }
+                  }
+                ]
+              }
             },
             "aggs": {
               "metadata.aiMetadata.model.raw": {
@@ -550,8 +574,7 @@
               }
             }
           }
-        },
-        "track_total_hits": false
+        }
       },
       "dateRange": {
         "from": "-7d",
@@ -559,7 +582,7 @@
       },
       "view": "segment",
       "funnel_query": {},
-      "urlQuery": "?seg[groups][0][field]=metadata.aiMetadata.model.raw&seg[groups][0][func]=terms&seg[groups][0][buckets]=5&seg[groups][0][by]=metric&seg[metrics][0][field]=metadata.aiMetadata.llmCost&seg[metrics][0][func]=weighted_sum&seg[metrics][0][customName]=Model%20Cost",
+      "urlQuery": "?evtcf[filtersGroups][0][filters][0][id]=f0&evtcf[filtersGroups][0][filters][0][field]=metadata.aiMetadata.model.raw&evtcf[filtersGroups][0][filters][0][name]=&evtcf[filtersGroups][0][filters][0][op]=exists&evtcf[filtersGroups][0][filters][0][value]=&seg[groups][0][field]=metadata.aiMetadata.model.raw&seg[groups][0][func]=terms&seg[groups][0][buckets]=5&seg[groups][0][by]=metric&seg[metrics][0][field]=metadata.aiMetadata.llmCost&seg[metrics][0][func]=weighted_sum&seg[metrics][0][customName]=Model%20Cost",
       "width": 1,
       "viewerFilters": [],
       "analyticType": "seg",
@@ -655,8 +678,7 @@
               }
             }
           }
-        },
-        "track_total_hits": false
+        }
       },
       "dateRange": {
         "from": "-7d",
@@ -720,8 +742,7 @@
               }
             }
           }
-        },
-        "track_total_hits": false
+        }
       },
       "dateRange": {
         "from": "-7d",
@@ -786,8 +807,7 @@
               }
             }
           }
-        },
-        "track_total_hits": false
+        }
       },
       "dateRange": {
         "from": "-7d",
