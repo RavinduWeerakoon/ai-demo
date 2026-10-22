@@ -55,14 +55,28 @@ spec:
                   name: meridian-web-managed-agent
                   key: MANAGED_AGENT_API_KEY
                   optional: true
+            # The single demo login. Optional: until the Secret exists nobody
+            # can sign in, but the site still starts.
+            - name: DEMO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-web-login
+                  key: DEMO_USERNAME
+                  optional: true
+            - name: DEMO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-web-login
+                  key: DEMO_PASSWORD
+                  optional: true
           readinessProbe:
             httpGet:
-              path: /
+              path: /login
               port: http
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /
+              path: /login
               port: http
             initialDelaySeconds: 15
             periodSeconds: 20

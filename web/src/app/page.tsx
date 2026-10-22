@@ -1,8 +1,9 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, LogOut } from "lucide-react";
 
 import { AgentModeProvider } from "@/components/agent-mode";
 import { ConciergeChat } from "@/components/concierge-chat";
 import { ModeBanner } from "@/components/mode-banner";
+import { signOut } from "@/app/login/actions";
 
 const gutter = "px-4 sm:px-[5vw] xl:px-20";
 
@@ -31,6 +32,16 @@ export default function Home() {
               <a href="#book" className="rounded-full bg-ember px-6 py-3 font-bold text-navy hover:bg-ember/90">
                 Book Now
               </a>
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 text-sm font-medium text-white/70 hover:text-ember"
+                  title="Sign out of the demo"
+                >
+                  <LogOut className="size-4" aria-hidden />
+                  Sign out
+                </button>
+              </form>
             </nav>
           </div>
         </header>

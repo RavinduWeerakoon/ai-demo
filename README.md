@@ -168,6 +168,8 @@ Chat messages go through a **server action** (`src/app/actions.ts`), not from th
 | `UNMANAGED_AGENT_API_KEY` | `AGENT_API_KEY` from the `concierge-unmanaged-api-key` Secret |
 | `MANAGED_AGENT_URL` | The Agent Manager agent's chat endpoint URL (ends in `/chat`) |
 | `MANAGED_AGENT_API_KEY` | An API key issued for that agent in Agent Manager (sent as `X-API-Key`, as the console's test chat does) |
+| `DEMO_USERNAME` / `DEMO_PASSWORD` | The single demo login in front of the site. Leave either unset and nobody can sign in |
+| `DEMO_SESSION_SECRET` | Optional key that signs the session cookie; defaults to `DEMO_PASSWORD` |
 
 ```bash
 cd web && cp .env.example .env.local   # then fill it in
@@ -187,4 +189,11 @@ kubectl --context agent-manager-demo -n meridian-demo create secret generic meri
 kubectl --context agent-manager-demo -n meridian-demo rollout restart deploy/meridian-web
 ```
 
-The site has no login: anyone who can reach the address can chat with both agents, and every message is a paid model call.
+The site sits behind a single demo login (`/login`). It is a showcase gate, not real authentication: one shared account, and a signed cookie that lasts 12 hours. Create the account, then restart the site:
+
+```bash
+kubectl --context agent-manager-demo -n meridian-demo create secret generic meridian-web-login --from-literal=DEMO_USERNAME=demo --from-literal=DEMO_PASSWORD="$(openssl rand -base64 18)"
+kubectl --context agent-manager-demo -n meridian-demo rollout restart deploy/meridian-web
+```
+
+Until that Secret exists nobody can sign in. Anyone given the password can chat with both agents, and every message is a paid model call, so share it only with the people running the demo.

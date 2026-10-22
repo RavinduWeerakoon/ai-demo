@@ -1,6 +1,9 @@
 "use server";
 
+import { cookies } from "next/headers";
+
 import { agentConfig, isAgentMode, type AgentMode } from "@/lib/agents";
+import { SESSION_COOKIE, isValidSessionToken } from "@/lib/demo-auth";
 
 export type ChatResult =
   | { ok: true; reply: string; sessionId: string; guardrail: string | null; toolsUsed: string[] }
@@ -22,6 +25,12 @@ export async function sendChatMessage(input: {
   sessionId: string;
   message: string;
 }): Promise<ChatResult> {
+  // Server functions can be called directly, so check the demo session here
+  // too rather than relying on the proxy alone.
+  if (!isValidSessionToken((await cookies()).get(SESSION_COOKIE)?.value)) {
+    return { ok: false, error: "Your session has ended. Reload the page to sign in again." };
+  }
+
   const { mode, sessionId } = input;
   const message = typeof input.message === "string" ? input.message.trim() : "";
 
