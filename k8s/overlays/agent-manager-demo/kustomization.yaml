@@ -1,4 +1,5 @@
 # agent-manager-demo cluster: images from the in-cluster OpenChoreo registry,
+# the demo website at https://meridian.agents.agent-manager.wso2demos.com,
 # and the hotel MCP server published over HTTPS on the data-plane gateway's
 # Let's Encrypt wildcard (*.agents.agent-manager.wso2demos.com).
 #   kubectl --context agent-manager-demo apply -k k8s/overlays/agent-manager-demo
@@ -8,10 +9,14 @@ namespace: meridian-demo
 resources:
   - ../../base
   - hotel-mcp-route.yaml
+  - meridian-web-route.yaml
 images:
   - name: meridian/hotel-mcp
     newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/hotel-mcp
     newTag: 0.1.1
   - name: meridian/concierge-agent
     newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/concierge-agent
-    newTag: 0.1.1
+    newTag: 0.1.2
+  - name: meridian/web
+    newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/web
+    newTag: 0.1.0

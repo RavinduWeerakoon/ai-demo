@@ -9,8 +9,11 @@ resources:
   - namespace.yaml
   - hotel-mcp.yaml
   - concierge-unmanaged.yaml
+  - meridian-web.yaml
 images:
   - name: meridian/hotel-mcp
     newTag: 0.1.0
   - name: meridian/concierge-agent
+    newTag: 0.1.0
+  - name: meridian/web
     newTag: 0.1.0

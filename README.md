@@ -173,3 +173,18 @@ Chat messages go through a **server action** (`src/app/actions.ts`), not from th
 cd web && cp .env.example .env.local   # then fill it in
 npm install && npm run dev             # http://localhost:3000
 ```
+
+### Deployed on agent-manager-demo
+
+The overlay also runs the site: **https://meridian.agents.agent-manager.wso2demos.com** (`meridian-web` in `meridian-demo`). It is covered by the data-plane gateway's wildcard certificate and wildcard DNS, so no certificate or DNS change was needed.
+
+- The image is a Next.js standalone build (`web/Dockerfile`), pushed to the in-cluster registry like the other two (`meridian/web:<tag>`, linux/amd64).
+- The unmanaged agent is called inside the cluster (`http://concierge-unmanaged:8000/chat`) with the key from the existing `concierge-unmanaged-api-key` Secret.
+- The managed agent's URL and key come from the `meridian-web-managed-agent` Secret. It is optional: until it exists, the managed toggle answers "not configured". Create it, then restart the site so it reads the new values:
+
+```bash
+kubectl --context agent-manager-demo -n meridian-demo create secret generic meridian-web-managed-agent --from-literal=MANAGED_AGENT_URL='https://<managed chat endpoint>/chat' --from-literal=MANAGED_AGENT_API_KEY='<Agent Manager API key>'
+kubectl --context agent-manager-demo -n meridian-demo rollout restart deploy/meridian-web
+```
+
+The site has no login: anyone who can reach the address can chat with both agents, and every message is a paid model call.

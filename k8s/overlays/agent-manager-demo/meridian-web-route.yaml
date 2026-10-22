@@ -1,0 +1,21 @@
+# https://meridian.agents.agent-manager.wso2demos.com
+# Covered by the data-plane gateway's wildcard certificate and the wildcard DNS
+# record, so no new certificate or DNS entry is needed.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: meridian-web
+  labels:
+    app.kubernetes.io/name: meridian-web
+    app.kubernetes.io/part-of: meridian-demo
+spec:
+  parentRefs:
+    - name: gateway-default
+      namespace: openchoreo-data-plane
+      sectionName: https
+  hostnames:
+    - meridian.agents.agent-manager.wso2demos.com
+  rules:
+    - backendRefs:
+        - name: meridian-web
+          port: 3000
