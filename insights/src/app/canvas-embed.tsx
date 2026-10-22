@@ -13,9 +13,9 @@ const CANVAS_URL = `${MOESIF_ORIGIN}/embed/canvas`;
 
 // Sent beside the template, not inside it (Canvas ignores a theme in the file).
 const THEME = {
-  brandColor: "#ff7a2f",
-  brandTextColor: "#14203a",
-  chartColors: ["#ff7a2f", "#3b6fd8", "#3ab65b", "#e04e5b", "#8e44ad", "#f2b134"],
+  brandColor: "#ff7300",
+  brandTextColor: "#40404b",
+  chartColors: ["#ff7300", "#4a29a5", "#3ab65b", "#2f80ed", "#e04e5b", "#f2b134"],
   navigation: { type: "tabs", showIcons: false },
   autoHeight: true,
 };
@@ -111,9 +111,9 @@ export function CanvasEmbed() {
   }, []);
 
   return (
-    <div className="relative">
+    <div className="relative rounded-xl border border-line bg-white shadow-sm">
       {status !== "ready" && (
-        <div className="absolute inset-0 z-10 flex items-start justify-center rounded-2xl pt-32 bg-white text-ink">
+        <div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-white pt-32 text-ink">
           {status === "error" ? (
             <p role="alert" className="max-w-md px-6 text-center text-sm font-medium text-error-ink">
               {error}
@@ -130,7 +130,7 @@ export function CanvasEmbed() {
         ref={frame}
         src={CANVAS_URL}
         title="AI cost and usage analytics"
-        className="block w-full rounded-2xl border-0 bg-white"
+        className="block w-full rounded-xl border-0 bg-white"
         style={{ height, visibility: status === "ready" ? "visible" : "hidden" }}
       />
     </div>

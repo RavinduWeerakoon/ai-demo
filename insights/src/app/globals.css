@@ -1,21 +1,27 @@
 @import "tailwindcss";
 
-/* The Meridian Colombo brand, shared with the demo website (web/). */
+/* WSO2 Agent Manager console look (Oxygen UI "Acrylic Orange", light scheme). */
 @theme {
-  --color-navy: #14203a;
-  --color-navy-card: #1b2a4a;
-  --color-navy-line: #2c3d63;
-  --color-navy-rule: #22304f;
-  --color-ember: #ff7a2f;
-  --color-body-muted: #c9d1e0;
-  --color-ink: #1a2233;
-  --color-ink-muted: #4a5163;
-  --color-line: #d5dae3;
+  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+
+  --color-canvas: #f5f5f5;
+  --color-ink: #40404b;
+  --color-ink-muted: #6b6b76;
+  --color-line: #00000012;
+  --color-line-strong: #0000001f;
+  --color-paper: #ffffffc5;
+  --color-brand: #ff7300;
+  --color-brand-dark: #e56700;
   --color-error-soft: #fdecec;
   --color-error-ink: #a11d1d;
 }
 
 body {
-  font-family: var(--font-jakarta), system-ui, sans-serif;
-  background: var(--color-navy);
+  color: var(--color-ink);
+  background-color: var(--color-canvas);
+  background-attachment: fixed;
+  background-image:
+    radial-gradient(circle at 65% 30%, rgba(255, 116, 0, 0.1) 10%, rgba(255, 255, 255, 0) 40% 40%),
+    radial-gradient(circle at 15% 50%, rgba(74, 41, 165, 0.1) 1%, rgba(255, 255, 255, 0) 40% 70%),
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.6) 0%, var(--color-canvas) 100%);
 }
