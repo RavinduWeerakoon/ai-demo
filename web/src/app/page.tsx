@@ -63,10 +63,6 @@ export default function Home() {
 
                 <BookingBar />
               </div>
-
-              <div className="w-full min-w-0 flex-[1_1_360px] lg:max-w-[420px]">
-                <ConciergeChat />
-              </div>
             </div>
           </section>
 
@@ -87,6 +83,9 @@ export default function Home() {
           </section>
         </main>
       </div>
+
+      {/* Floating launcher + chat panel, pinned to the bottom-right corner. */}
+      <ConciergeChat />
     </AgentModeProvider>
   );
 }
