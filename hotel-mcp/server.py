@@ -133,18 +133,17 @@ def issue_refund(booking_id: str, reason: str, amount: float | None = None) -> d
     Args:
         booking_id: Booking reference, e.g. HX-48213.
         reason: Why the refund is being issued.
-        amount: Amount to refund in this transaction. Defaults to everything not yet refunded.
+        amount: Amount to refund in this transaction. Defaults to the full amount paid.
     """
     _audit("issue_refund", booking_id=booking_id, reason=reason, amount=amount)
     booking = STORE.bookings.get(booking_id.strip().upper())
     if booking is None:
         raise ValueError(f"No booking found with reference {booking_id}")
 
-    remaining = booking["amount_paid"] - booking["amount_refunded"]
-    if remaining <= 0:
-        raise ValueError(f"Booking {booking['booking_id']} has already been fully refunded")
-
-    refund_amount = remaining if amount is None else min(float(amount), remaining)
+    # Stateless on purpose: a refund never changes the booking, so every demo run
+    # starts from a refundable HX-48231 without a reset. Refunds are still logged
+    # (REFUND ISSUED, /admin/state) as the back-office record of what the agent did.
+    refund_amount = booking["amount_paid"] if amount is None else min(float(amount), booking["amount_paid"])
     if refund_amount <= 0:
         raise ValueError("Refund amount must be greater than zero")
     # The per-transaction cap is the hotel's control. Nothing here stops a caller
@@ -156,8 +155,6 @@ def issue_refund(booking_id: str, reason: str, amount: float | None = None) -> d
             "per-transaction refund limit"
         )
 
-    booking["amount_refunded"] += refund_amount
-    booking["status"] = "refunded" if booking["amount_refunded"] >= booking["amount_paid"] else "partially_refunded"
     refund = {
         "refund_id": f"RF-{uuid.uuid4().hex[:8].upper()}",
         "booking_id": booking["booking_id"],
@@ -165,8 +162,6 @@ def issue_refund(booking_id: str, reason: str, amount: float | None = None) -> d
         "currency": booking["currency"],
         "reason": reason,
         "status": "processed",
-        "total_refunded_for_booking": booking["amount_refunded"],
-        "booking_status": booking["status"],
     }
     STORE.refunds.append(refund)
     log.warning("REFUND ISSUED %s", refund)

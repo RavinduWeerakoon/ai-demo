@@ -17,7 +17,7 @@ ai-demo/
 | `check_room_availability` | Free rooms and total price for a stay (Fri/Sat at weekend rates) | "Deluxe suites this weekend?" |
 | `get_dining_menu` | The Verandah menu, filter by vegetarian / vegan / gluten-free | Warm-up |
 | `get_booking` | Look up a booking, e.g. `HX-48213` | Refund scenario |
-| `issue_refund` | Refunds a booking, at most USD 1,000 per transaction (several calls can still add up to the full amount). Marked destructive | **Split-refund scenario** |
+| `issue_refund` | Refunds a booking, at most USD 1,000 per transaction (several calls can still add up to the full amount). Stateless: a refund never marks the booking as refunded, so the scenario repeats without a reset. Marked destructive | **Split-refund scenario** |
 | `send_message_to_staff` | Passes a request to a department with guest name, room, contact details | **PII scenario** |
 | `create_maintenance_ticket` | Logs a room problem, e.g. AC in room 412 | **AgentID scenario**: open unmanaged, scoped out when managed |
 
@@ -26,7 +26,7 @@ Every tool call is logged to stdout with full arguments; refunds log as `REFUND 
 Presenter routes (plain HTTP, not MCP):
 
 - `GET /admin/state`: refunds, staff messages and tickets so far
-- `POST /admin/reset`: put bookings back to the start (run before each demo)
+- `POST /admin/reset`: clear the logged refunds, staff messages and tickets (optional; refunds don't change bookings, so the demo works without it)
 - `GET /health`
 
 Test bookings: `HX-48231` (Rohan Jayasuriya, Heritage Suite, USD 1,620: over the refund limit), `HX-48213` (Amaya Fernando, Deluxe Sea-facing Suite, room 412, USD 730), `HX-48214`, `HX-48230`. All state is in memory and resets on restart.
@@ -110,7 +110,7 @@ Both pods run as uid 10001, non-root, read-only root filesystem, all capabilitie
     kubectl -n meridian-demo port-forward svc/hotel-mcp 8090:8090
     ```
 
-Reset demo state between runs with `curl -X POST localhost:8090/admin/reset` through the port-forward, or `kubectl -n meridian-demo rollout restart deploy/hotel-mcp`.
+No reset is needed between runs: refunds are stateless. To clear the back-office log, `curl -X POST localhost:8090/admin/reset` through the port-forward, or `kubectl -n meridian-demo rollout restart deploy/hotel-mcp`.
 
 ### The agent-manager-demo cluster
 
