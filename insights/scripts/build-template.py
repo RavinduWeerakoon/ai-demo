@@ -1,63 +1,32 @@
 #!/usr/bin/env python3
 """Turn a Moesif "Export for Canvas" file into the dashboard template this app serves.
 
-    python3 scripts/build-template.py ~/Downloads/canvas_ai_dashboard.json
+    python3 scripts/build-template.py ~/Downloads/canvas_ai_dashboard.json [output.json]
 
-The export carries each chart's query. Canvas-only settings are added here so a
-fresh export never loses them: the grid layout, tooltips, KPI number formatting
-($, decimals, trend arrows), the Agent filter, and metric labels. Cards are
-matched by their Moesif id, which stays the same when a chart is edited. A chart
-that is new to this script still appears, in its own row at the bottom, with
-Moesif's own formatting; add it to the tables below to place and format it.
+The export carries each chart's query. Canvas-only presentation is added here,
+so a fresh export never loses it, and it works with anyone's Moesif dashboard:
+
+- Single-number charts (no Group By, one metric) become KPI cards in the top
+  row, cost totals first. A cost metric (a field containing "llmCost") gets a $ prefix, 4 decimals
+  and a trend arrow where up is red; any other gets compact notation (12.3k)
+  and a trend arrow where up is green.
+- Every other chart follows, two to a row, in the order set in
+  dashboard-layout.json ("order"; charts it does not name come last).
+  Charts listed in "wide" take two thirds of their row.
+- Tooltips come from "tooltips", keyed by chart name.
+- Moesif's placeholder metric names ("Metric a") become readable labels from
+  "metricLabels", keyed by the end of the field name.
+- An Agent filter (by LLM proxy name) is added to the toolbar.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent.parent / "src/app/canvas-template.json"
-
-TOTAL_COST = "6ad9b1b74d991b5f3e566144"
-AVG_COST = "6ad9b81e1c70fd45e7280865"
-REQUESTS = "6ad9b87be8a5be38822e2e60"
-SPEND_PIE = "6ad9b9d61c70fd45e728086e"
-MODEL_AFFINITY = "6ad8a13e1c70fd45e728026f"
-DAILY_COST = "6ad89faa4d991b5f3e565c0a"
-COST_BY_MODEL = "6ad8a03e4d991b5f3e565c0e"
-AVG_DAILY = "6ad8a0d1e8a5be38822e2912"
-TOKENS = "6ad8a1aee8a5be38822e2922"
-
-# Rows of the grid, top to bottom. Within a row, "width" is each card's share.
-ROWS = [
-    [TOTAL_COST, AVG_COST, REQUESTS],
-    [SPEND_PIE, MODEL_AFFINITY],
-    [DAILY_COST, COST_BY_MODEL],
-    [AVG_DAILY, TOKENS],
-]
-WIDTH = {DAILY_COST: 2, TOKENS: 2}
-
-TOOLTIPS = {
-    TOTAL_COST: "What every LLM call through the AI gateway cost in the selected period.",
-    AVG_COST: "Average cost of a single LLM call.",
-    REQUESTS: "LLM calls made through the AI gateway.",
-    SPEND_PIE: "Share of the spend that went to each model.",
-    MODEL_AFFINITY: "Share of LLM calls that went to each model.",
-    DAILY_COST: "Total LLM spend per day.",
-    COST_BY_MODEL: "Spend per model, highest first.",
-    AVG_DAILY: "Average cost of one call per day, for the five most expensive models.",
-    TOKENS: "Prompt and completion tokens sent through the gateway per day.",
-}
-
-# Single-number cards. Trend arrows compare with the previous period; for cost,
-# going up is shown red.
-KPI = {
-    TOTAL_COST: {"unit": "$", "prefixedUnits": True, "decimals": 4, "trendIndicator": {"isIncreasementGreen": False}},
-    AVG_COST: {"unit": "$", "prefixedUnits": True, "decimals": 4, "trendIndicator": {"isIncreasementGreen": False}},
-    REQUESTS: {"abbreviate": True, "decimals": 0, "trendIndicator": {"isIncreasementGreen": True}},
-}
-
-# Metric labels to replace (Moesif's default names read badly in a legend).
-RENAME = {SPEND_PIE: {"Metric a": "Cost (USD)"}}
+ROOT = Path(__file__).resolve().parent.parent
+LAYOUT = ROOT / "dashboard-layout.json"
+OUT = ROOT / "src/app/canvas-template.json"
 
 AGENT_FILTER = {
     "id": "agent",
@@ -68,50 +37,102 @@ AGENT_FILTER = {
     "multi": True,
     "default": None,
 }
+PLACEHOLDER_NAME = re.compile(r"^Metric [a-z]$")
+
+
+def is_kpi(card: dict) -> bool:
+    settings = card.get("settings", {})
+    return (
+        card.get("analyticType") == "seg"
+        and not settings.get("groups")
+        and len(settings.get("metrics", [])) == 1
+    )
+
+
+def kpi_format(card: dict) -> dict:
+    metric = card["settings"]["metrics"][0]
+    if "llmcost" in metric.get("field", "").lower():
+        number = {"unit": "$", "prefixedUnits": True, "decimals": 4, "trendIndicator": {"isIncreasementGreen": False}}
+    else:
+        number = {"abbreviate": True, "decimals": 0, "trendIndicator": {"isIncreasementGreen": True}}
+    return {"chartHeight": 80, "hideLabel": True, **number}
 
 
 def url_encode(text: str) -> str:
     return text.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
 
 
-def main() -> None:
-    if len(sys.argv) != 2:
-        sys.exit(__doc__)
-    template = json.loads(Path(sys.argv[1]).expanduser().read_text())
-    if len(template.get("dashboards", [])) != 1:
-        sys.exit("Expected an export of exactly one dashboard.")
-    cards = {card["_id"]: card for card in template["workspaces"]}
+def relabel_metrics(card: dict, labels: dict) -> None:
+    for metric in card["settings"].get("metrics", []):
+        old = metric.get("customName", "")
+        if not PLACEHOLDER_NAME.match(old):
+            continue
+        field_end = metric.get("field", "").rsplit(".", 1)[-1]
+        new = labels.get(field_end)
+        if new:
+            metric["customName"] = new
+            card["urlQuery"] = card["urlQuery"].replace(
+                f"customName]={url_encode(old)}", f"customName]={url_encode(new)}"
+            )
 
-    rows = [[cid for cid in row if cid in cards] for row in ROWS]
-    placed = {cid for row in rows for cid in row}
-    new_cards = [cid for cid in cards if cid not in placed]
-    rows = [row for row in rows if row] + ([new_cards] if new_cards else [])
-    for cid in sorted(set(sum(ROWS, [])) - set(cards)):
-        print(f"note: {cid} is no longer in the export; left out")
-    for cid in new_cards:
-        print(f"note: new chart {cards[cid]['name']!r} ({cid}) added in a row of its own")
+
+def main() -> None:
+    if len(sys.argv) not in (2, 3):
+        sys.exit(__doc__)
+    out = Path(sys.argv[2]).resolve() if len(sys.argv) == 3 else OUT
+    template = json.loads(Path(sys.argv[1]).expanduser().read_text())
+    layout = json.loads(LAYOUT.read_text())
+    if len(template.get("dashboards", [])) != 1:
+        sys.exit("Expected an export of exactly one Moesif dashboard.")
+    cards = template["workspaces"]
+    if not cards:
+        sys.exit("The export has no charts.")
+
+    # Cost totals first, then cost averages, then counts.
+    kpis = sorted(
+        (c for c in cards if is_kpi(c)),
+        key=lambda c: (
+            "llmcost" not in c["settings"]["metrics"][0].get("field", "").lower(),
+            "avg" in c["settings"]["metrics"][0].get("func", ""),
+        ),
+    )
+    rank = {name: i for i, name in enumerate(layout.get("order", []))}
+    others = sorted(
+        (c for c in cards if not is_kpi(c)),
+        key=lambda c: rank.get(c["name"], len(rank)),  # stable: unlisted keep export order
+    )
+
+    rows = []
+    if kpis:
+        rows.append([c["_id"] for c in kpis])
+    for i in range(0, len(others), 2):
+        rows.append([c["_id"] for c in others[i : i + 2]])
 
     dashboard = template["dashboards"][0]
-    dashboard["name"] = "AI Cost & Usage"
+    dashboard["name"] = layout.get("title", dashboard["name"])
     dashboard["workspace_ids"] = rows
+    dashboard["dashboard_ids"] = []
     dashboard["filters"] = {"editable": [AGENT_FILTER]}
 
-    for cid, card in cards.items():
-        card["width"] = WIDTH.get(cid, 1)
+    wide = set(layout.get("wide", []))
+    tooltips = layout.get("tooltips", {})
+    for card in cards:
+        card["width"] = 2 if card["name"] in wide and not is_kpi(card) else 1
         card["height"] = 1
-        if cid in TOOLTIPS:
-            card["tooltip"] = TOOLTIPS[cid]
-        if cid in KPI:
+        if card["name"] in tooltips:
+            card["tooltip"] = tooltips[card["name"]]
+        if is_kpi(card):
             card["settings"]["groups"] = []
-            card["settings"]["singleValueSettings"] = {"chartHeight": 80, "hideLabel": True, **KPI[cid]}
-        for old, new in RENAME.get(cid, {}).items():
-            for metric in card["settings"].get("metrics", []):
-                if metric.get("customName") == old:
-                    metric["customName"] = new
-            card["urlQuery"] = card["urlQuery"].replace(f"customName]={url_encode(old)}", f"customName]={url_encode(new)}")
+            card["settings"]["singleValueSettings"] = kpi_format(card)
+        relabel_metrics(card, layout.get("metricLabels", {}))
 
-    OUT.write_text(json.dumps(template, indent=2) + "\n")
-    print(f"wrote {OUT.relative_to(Path.cwd()) if OUT.is_relative_to(Path.cwd()) else OUT} ({len(cards)} charts)")
+    out.write_text(json.dumps(template, indent=2) + "\n")
+    print(f"Wrote {out}: {len(kpis)} KPI cards, {len(others)} charts.")
+    for row in rows:
+        print("  row:", ", ".join(next(c["name"] for c in cards if c["_id"] == cid) for cid in row))
+    unnamed = [c["name"] for c in cards if c["name"] not in tooltips]
+    if unnamed:
+        print("  no tooltip for:", ", ".join(unnamed), "(add them to dashboard-layout.json if you like)")
 
 
 if __name__ == "__main__":

@@ -26,18 +26,18 @@ Every signed-in visitor can read it in the browser, so give it nothing more.
   then moves to the app's page and sends `CANVAS_READY`; only then does it take
   the key again plus the template. It never sends `CANVAS_RENDERED`, so the frame
   is shown once the template is sent.
-- `src/app/canvas-template.json` is the dashboard: an "Export for Canvas" from
-  the Moesif "AI dashboard", with the layout, `$` units, trend arrows, tooltips
-  and an Agent filter added. It is a copy, so editing a chart in Moesif does not
-  change this page until you export again and regenerate it:
+- `src/app/canvas-template.json` is the dashboard. It is generated from a
+  Moesif "Export for Canvas" file, so editing a chart in Moesif does not change
+  this page until you export again and regenerate it:
 
   ```bash
-  python3 scripts/build-template.py ~/Downloads/canvas_ai_dashboard.json
+  python3 scripts/build-template.py ~/Downloads/canvas_<dashboard>.json
   ```
 
-  The script re-applies the additions to the fresh export. A brand-new chart
-  lands in its own row at the bottom; add it to the tables in the script to
-  place and format it. Then build and deploy a new image version.
+  It works with any Moesif dashboard. Single-number charts become KPI cards on
+  top (cost ones get a `$` and 4 decimals); the rest follow two to a row. Chart
+  order, wide charts, tooltips and metric labels are set by chart name in
+  `dashboard-layout.json`. Then build and deploy a new image version.
 
 ## Deploy
 

@@ -1,0 +1,31 @@
+{
+  "title": "AI Cost & Usage",
+  "order": [
+    "Spend by Model",
+    "Model Affinity",
+    "Total AI Cost (daily)",
+    "Cost by Model",
+    "Cost per Agent",
+    "Avg Cost per LLM Call",
+    "Daily Token Usage"
+  ],
+  "wide": ["Total AI Cost (daily)", "Daily Token Usage"],
+  "tooltips": {
+    "Total AI Cost Spend": "What every LLM call through the AI gateway cost in the selected period.",
+    "Total AI Cost": "What every LLM call through the AI gateway cost in the selected period.",
+    "Avg. Cost per Request": "Average cost of a single LLM call.",
+    "Total LLM Requests": "LLM calls made through the AI gateway.",
+    "Spend by Model": "Share of the spend that went to each model.",
+    "Model Affinity": "Share of LLM calls that went to each model.",
+    "Total AI Cost (daily)": "Total LLM spend per day.",
+    "Cost by Model": "Spend per model, highest first.",
+    "Cost per Agent": "Spend per agent. Each agent's LLM proxy name starts with its LLM configuration name.",
+    "Avg Cost per LLM Call": "Average cost of one call per day.",
+    "Daily Token Usage": "Prompt and completion tokens sent through the gateway per day."
+  },
+  "metricLabels": {
+    "llmCost": "Cost (USD)",
+    "promptTokens": "Prompt tokens",
+    "completionTokens": "Completion tokens"
+  }
+}

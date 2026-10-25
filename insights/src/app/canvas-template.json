@@ -401,7 +401,7 @@
         "chartType": "bar"
       },
       "height": 1,
-      "tooltip": "Average cost of one call per day, for the five most expensive models."
+      "tooltip": "Average cost of one call per day."
     },
     {
       "_id": "6ad8a13e1c70fd45e728026f",
