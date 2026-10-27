@@ -206,7 +206,7 @@ A separate Next.js app that embeds the Moesif Canvas dashboard of the demo's LLM
 
 | Variable (`insights/.env.local`) | Value |
 | --- | --- |
-| `DEMO_USERNAME` / `DEMO_PASSWORD` | The demo login. On the cluster it reuses the website's `meridian-web-login` Secret |
+| `DEMO_USERNAME` / `DEMO_PASSWORD` | The demo login. On the cluster the username is `meridian-ai` (set in `k8s/base/insights-web.yaml`) and the password comes from the website's `meridian-web-login` Secret |
 | `MOESIF_CANVAS_KEY` | Moesif management API key with read access to events only, without the `Bearer ` prefix. Any signed-in visitor can read it in the browser |
 
 ```bash

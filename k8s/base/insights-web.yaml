@@ -3,7 +3,8 @@
 # signed-in visitor opens the page.
 #
 # Secrets it reads (both optional, so the app starts without them):
-#   meridian-web-login   DEMO_USERNAME, DEMO_PASSWORD (the website's demo account)
+#   meridian-web-login   DEMO_PASSWORD (the website's demo password; the username
+#                        here is meridian-ai, not the website's)
 #   insights-moesif      MOESIF_CANVAS_KEY (Moesif management key, read access to events only)
 apiVersion: apps/v1
 kind: Deployment
@@ -36,12 +37,9 @@ spec:
             - name: http
               containerPort: 3000
           env:
+            # Its own username, so it differs from the hotel website's login.
             - name: DEMO_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: meridian-web-login
-                  key: DEMO_USERNAME
-                  optional: true
+              value: meridian-ai
             - name: DEMO_PASSWORD
               valueFrom:
                 secretKeyRef:
