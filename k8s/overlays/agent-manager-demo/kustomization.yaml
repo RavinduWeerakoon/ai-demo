@@ -24,7 +24,7 @@ images:
     newTag: 0.1.2
   - name: meridian/split-view
     newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/split-view
-    newTag: 0.1.1
+    newTag: 0.1.2
   - name: meridian/insights
     newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/insights
     newTag: 0.1.2

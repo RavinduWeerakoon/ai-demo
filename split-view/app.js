@@ -36,10 +36,58 @@
   const signIn = document.getElementById("sign-in");
   let rightLoads = 0;
   let awaitingSignIn = false;
+  let signInNeeded = false;
+
+  // The right pane's tabs: Agent Manager, then each view in config.rightTabs.
+  // Every view keeps its own frame and a tab only hides the others, so
+  // switching never reloads a site or loses the presenter's place. A view's
+  // frame loads the first time its tab is opened.
+  const tabBar = document.getElementById("pane-tabs");
+  const views = [{ label: (config.right && config.right.label) || "Agent Manager", frame: rightFrame }];
+  for (const tab of config.rightTabs || []) {
+    const url = safeUrl(null, tab.url);
+    if (!url || !tab.label) continue;
+    const frame = document.createElement("iframe");
+    frame.className = "frame";
+    frame.title = tab.label;
+    frame.referrerPolicy = "strict-origin-when-cross-origin";
+    frame.allow = "clipboard-read; clipboard-write; fullscreen";
+    frame.hidden = true;
+    signIn.before(frame);
+    views.push({ label: tab.label, url, frame });
+  }
+  let active = 0;
+
+  function renderRight() {
+    views.forEach((view, i) => {
+      view.frame.hidden = i !== active;
+      if (view.tab) view.tab.setAttribute("aria-selected", String(i === active));
+    });
+    // The sign-in cover belongs to Agent Manager only.
+    signIn.hidden = active !== 0 || !signInNeeded;
+  }
+
+  if (views.length > 1) {
+    views.forEach((view, i) => {
+      view.tab = document.createElement("button");
+      view.tab.type = "button";
+      view.tab.className = "pane-tab";
+      view.tab.setAttribute("role", "tab");
+      view.tab.textContent = view.label;
+      view.tab.addEventListener("click", () => {
+        active = i;
+        if (view.url && !view.frame.getAttribute("src")) view.frame.src = view.url;
+        renderRight();
+      });
+      tabBar.append(view.tab);
+    });
+    tabBar.hidden = false;
+  }
 
   function loadRight() {
     rightLoads = 0;
-    signIn.hidden = true;
+    signInNeeded = false;
+    renderRight();
     rightFrame.src = rightUrl;
   }
 
@@ -50,7 +98,10 @@
       if (rightFrame.contentWindow.location.href === "about:blank") return;
     } catch {}
     rightLoads += 1;
-    if (rightLoads > 1) signIn.hidden = false;
+    if (rightLoads > 1) {
+      signInNeeded = true;
+      renderRight();
+    }
   });
 
   document.getElementById("sign-in-button").addEventListener("click", () => {

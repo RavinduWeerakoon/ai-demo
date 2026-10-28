@@ -16,11 +16,14 @@
     <div class="divider" id="divider" role="separator" tabindex="0" aria-orientation="vertical"
       aria-controls="frame-left frame-right" aria-valuemin="15" aria-valuemax="85" aria-label="Resize panes"></div>
     <div class="pane-right">
-      <iframe class="frame" id="frame-right" title="WSO2 Agent Manager" referrerpolicy="strict-origin-when-cross-origin"
-        allow="clipboard-read; clipboard-write; fullscreen"></iframe>
-      <div class="sign-in" id="sign-in" hidden>
-        <button type="button" class="sign-in-button" id="sign-in-button">Sign in to Agent Manager</button>
-        <p class="sign-in-hint">Opens in a new tab. This pane reloads when you come back.</p>
+      <div class="pane-tabs" id="pane-tabs" role="tablist" aria-label="Right pane" hidden></div>
+      <div class="pane-body" id="pane-body">
+        <iframe class="frame" id="frame-right" title="WSO2 Agent Manager" referrerpolicy="strict-origin-when-cross-origin"
+          allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+        <div class="sign-in" id="sign-in" hidden>
+          <button type="button" class="sign-in-button" id="sign-in-button">Sign in to Agent Manager</button>
+          <p class="sign-in-hint">Opens in a new tab. This pane reloads when you come back.</p>
+        </div>
       </div>
     </div>
   </main>
