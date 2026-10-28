@@ -17,32 +17,7 @@ body { background: #0f1626; }
 .frame { display: block; min-width: 0; min-height: 0; border: 0; background: #fff; }
 #frame-left { flex: 0 0 calc(var(--split) * 1% - var(--divider) / 2); }
 .pane-right { position: relative; flex: 1 1 0; display: flex; min-width: 0; min-height: 0; }
-#frame-right, #frame-cost { flex: 1 1 0; }
-.frame[hidden] { display: none; }
-
-/* Top-right of the right pane: Agent Manager <-> AI cost analytics. */
-.pane-switch {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid rgb(255 255 255 / 0.18);
-  border-radius: 999px;
-  background: #14203a;
-  color: #fff;
-  font: 600 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
-  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
-  cursor: pointer;
-}
-.pane-switch[hidden] { display: none; }
-.pane-switch:hover { background: #1f2f52; }
-.pane-switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-body.dragging .pane-switch { pointer-events: none; }
+#frame-right { flex: 1 1 0; }
 
 /* Shown over the Agent Manager pane when it has left the console for sign-in,
    whose page refuses to load inside a frame. */
@@ -55,7 +30,6 @@ body.dragging .pane-switch { pointer-events: none; }
   justify-content: center;
   gap: 12px;
   padding: 24px;
-  z-index: 1;
   background: #0f1626;
   text-align: center;
 }

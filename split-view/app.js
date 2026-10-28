@@ -33,44 +33,13 @@
   // framed, and that shows up here as a second load. Then offer sign-in in a
   // new tab, and reload the pane when the presenter comes back.
   const rightFrame = document.getElementById("frame-right");
-  const costFrame = document.getElementById("frame-cost");
   const signIn = document.getElementById("sign-in");
-  const paneSwitch = document.getElementById("pane-switch");
-  const cost = config.costAnalytics || {};
-  const costUrl = safeUrl(null, cost.url);
-  const costLabel = cost.label || "AI cost analytics";
   let rightLoads = 0;
   let awaitingSignIn = false;
-  let signInNeeded = false;
-  let showingCost = false;
-
-  // The right pane shows either Agent Manager or the cost analytics site. Each
-  // keeps its own frame and the switch only hides one, so going back and forth
-  // never reloads either site or loses the presenter's place.
-  function renderRight() {
-    rightFrame.hidden = showingCost;
-    costFrame.hidden = !showingCost;
-    signIn.hidden = showingCost || !signInNeeded;
-    paneSwitch.textContent = showingCost ? "← Back to Agent Manager" : costLabel;
-    paneSwitch.setAttribute(
-      "aria-label",
-      showingCost ? "Back to Agent Manager" : `Open ${costLabel} in this pane`,
-    );
-  }
-
-  if (costUrl) {
-    paneSwitch.hidden = false;
-    paneSwitch.addEventListener("click", () => {
-      showingCost = !showingCost;
-      if (showingCost && !costFrame.getAttribute("src")) costFrame.src = costUrl;
-      renderRight();
-    });
-  }
 
   function loadRight() {
     rightLoads = 0;
-    signInNeeded = false;
-    renderRight();
+    signIn.hidden = true;
     rightFrame.src = rightUrl;
   }
 
@@ -81,10 +50,7 @@
       if (rightFrame.contentWindow.location.href === "about:blank") return;
     } catch {}
     rightLoads += 1;
-    if (rightLoads > 1) {
-      signInNeeded = true;
-      renderRight();
-    }
+    if (rightLoads > 1) signIn.hidden = false;
   });
 
   document.getElementById("sign-in-button").addEventListener("click", () => {
