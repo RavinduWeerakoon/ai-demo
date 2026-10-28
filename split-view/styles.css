@@ -1,0 +1,95 @@
+:root {
+  --divider: 8px;
+  --divider-bg: #1c2843;
+  --divider-hover: #2c3d63;
+  --focus: #8ccdeb;
+  --split: 50; /* left frame's share, in percent */
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body { background: #0f1626; }
+
+.split { display: flex; height: 100%; }
+
+.frame { display: block; min-width: 0; min-height: 0; border: 0; background: #fff; }
+#frame-left { flex: 0 0 calc(var(--split) * 1% - var(--divider) / 2); }
+.pane-right { position: relative; flex: 1 1 0; display: flex; min-width: 0; min-height: 0; }
+#frame-right, #frame-cost { flex: 1 1 0; }
+.frame[hidden] { display: none; }
+
+/* Top-right of the right pane: Agent Manager <-> AI cost analytics. */
+.pane-switch {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 999px;
+  background: #14203a;
+  color: #fff;
+  font: 600 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+}
+.pane-switch[hidden] { display: none; }
+.pane-switch:hover { background: #1f2f52; }
+.pane-switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+body.dragging .pane-switch { pointer-events: none; }
+
+/* Shown over the Agent Manager pane when it has left the console for sign-in,
+   whose page refuses to load inside a frame. */
+.sign-in {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  z-index: 1;
+  background: #0f1626;
+  text-align: center;
+}
+.sign-in[hidden] { display: none; }
+.sign-in-button {
+  min-height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  background: #2f6fd0;
+  color: #fff;
+  font: 600 15px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  cursor: pointer;
+}
+.sign-in-button:hover { background: #3a7ae0; }
+.sign-in-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.sign-in-hint { margin: 0; color: #a3b0c6; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+.divider {
+  flex: 0 0 var(--divider);
+  background: var(--divider-bg);
+  cursor: col-resize;
+  touch-action: none;
+}
+.divider:hover, body.dragging .divider { background: var(--divider-hover); }
+.divider:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+/* While dragging, the iframes would swallow pointer events and stall the drag. */
+body.dragging { cursor: col-resize; user-select: none; }
+body.dragging .frame { pointer-events: none; }
+
+/* Narrow screens: frames stack and the divider resizes vertically. */
+@media (max-width: 760px) {
+  .split { flex-direction: column; }
+  .divider { cursor: row-resize; }
+  body.dragging { cursor: row-resize; }
+}

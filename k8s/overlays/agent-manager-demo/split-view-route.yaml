@@ -1,0 +1,21 @@
+# https://showcase.agents.agent-manager.wso2demos.com
+# Same site (wso2demos.com) as both framed apps, which is what lets their login
+# cookies and storage work inside the iframes.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: split-view
+  labels:
+    app.kubernetes.io/name: split-view
+    app.kubernetes.io/part-of: meridian-demo
+spec:
+  parentRefs:
+    - name: gateway-default
+      namespace: openchoreo-data-plane
+      sectionName: https
+  hostnames:
+    - showcase.agents.agent-manager.wso2demos.com
+  rules:
+    - backendRefs:
+        - name: split-view
+          port: 8080

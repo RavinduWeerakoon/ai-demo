@@ -1,0 +1,16 @@
+# Non-secret run settings. Provider URLs, keys and models live in the Secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-traffic-settings
+  labels:
+    app.kubernetes.io/name: llm-traffic
+    app.kubernetes.io/part-of: meridian-demo
+data:
+  TRAFFIC_MIN_PER_PROVIDER: "3"   # conversations per provider per run, picked at random
+  TRAFFIC_MAX_PER_PROVIDER: "8"
+  TRAFFIC_MIN_PAUSE_SECONDS: "5"  # random pause between conversations
+  TRAFFIC_MAX_PAUSE_SECONDS: "60"
+  TRAFFIC_START_JITTER_SECONDS: "3600"  # start up to 1h after the cron time
+  TRAFFIC_MAX_TOKENS: "300"       # cap per reply, keeps the daily cost small
+  TRAFFIC_TIMEOUT_SECONDS: "90"

@@ -200,6 +200,20 @@ kubectl --context agent-manager-demo -n meridian-demo rollout restart deploy/mer
 
 Until that Secret exists nobody can sign in. Anyone given the password can chat with both agents, and every message is a paid model call, so share it only with the people running the demo.
 
+## Split view (`split-view/`)
+
+One page that is only two resizable iframes: the Meridian site on the left, the Agent Manager console on the right. Plain HTML, CSS and JavaScript; no build step.
+
+- Drag the divider, use the arrow keys on it (Shift for bigger steps, Home/End for the limits), or double-click it for 50/50. The size is remembered per browser. On phones the frames stack.
+- **AI cost analytics** (top-right of the Agent Manager pane) swaps that pane to the Agent Insights cost site (`https://insights.agents.agent-manager.wso2demos.com`); **← Back to Agent Manager** swaps back. Each site keeps its own frame, so switching never reloads either one.
+- Change what the frames show in `config.js`, or per visit with `?left=<url>&right=<url>` (the page's security policy only allows `*.agent-manager.wso2demos.com` sites in the frames).
+- **Signing in to Agent Manager:** its sign-in server (`thunder.agent-manager.wso2demos.com`) sends `X-Frame-Options: DENY`, so the sign-in page can't open inside the frame. When the console is signed out it redirects the frame to that server; the page notices the extra frame load and covers the Agent Manager pane with a **Sign in to Agent Manager** button. It opens the console in a new tab; sign in there, come back, and the pane reloads signed in.
+- **Host it under `*.wso2demos.com`.** Browsers only share a framed site's login session (cookies, storage) when the outer page is on the same site. Served from `localhost` or `file://`, the frames load but the Meridian login and the Agent Manager session won't carry into them.
+
+Run locally (layout only): `cd split-view && python3 -m http.server 8765`.
+
+On agent-manager-demo it is meant to run at **https://showcase.agents.agent-manager.wso2demos.com** (`k8s/base/split-view.yaml`, `k8s/overlays/agent-manager-demo/split-view-route.yaml`): build `meridian/split-view:<tag>` for linux/amd64 from `split-view/`, push it to the in-cluster registry like the other images, then apply the overlay.
+
 ## AI Insights dashboard (`insights/`)
 
 A separate Next.js app that embeds the Moesif Canvas dashboard of the demo's LLM traffic (cost, model mix, token use), behind the same demo login as the website. On agent-manager-demo it runs as `insights-web` at **https://insights.agents.agent-manager.wso2demos.com**, again covered by the wildcard certificate and DNS. See `insights/README.md` for how the embed works.

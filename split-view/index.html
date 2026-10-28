@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Manager Demo</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314203a'/%3E%3Crect x='7' y='8' width='8' height='16' rx='2' fill='%23ff7a2f'/%3E%3Crect x='17' y='8' width='8' height='16' rx='2' fill='%232f6fd0'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="split" id="split">
+    <iframe class="frame" id="frame-left" title="The Meridian Colombo" referrerpolicy="strict-origin-when-cross-origin"
+      allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+    <div class="divider" id="divider" role="separator" tabindex="0" aria-orientation="vertical"
+      aria-controls="frame-left frame-right" aria-valuemin="15" aria-valuemax="85" aria-label="Resize panes"></div>
+    <div class="pane-right">
+      <iframe class="frame" id="frame-right" title="WSO2 Agent Manager" referrerpolicy="strict-origin-when-cross-origin"
+        allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+      <iframe class="frame" id="frame-cost" title="AI cost analytics" referrerpolicy="strict-origin-when-cross-origin"
+        allow="clipboard-read; clipboard-write; fullscreen" hidden></iframe>
+      <button type="button" class="pane-switch" id="pane-switch" hidden></button>
+      <div class="sign-in" id="sign-in" hidden>
+        <button type="button" class="sign-in-button" id="sign-in-button">Sign in to Agent Manager</button>
+        <p class="sign-in-hint">Opens in a new tab. This pane reloads when you come back.</p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
