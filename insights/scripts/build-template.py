@@ -16,7 +16,8 @@ so a fresh export never loses it, and it works with anyone's Moesif dashboard:
 - Tooltips come from "tooltips", keyed by chart name.
 - Moesif's placeholder metric names ("Metric a") become readable labels from
   "metricLabels", keyed by the end of the field name.
-- An Agent filter (by LLM proxy name) is added to the toolbar.
+- An "LLM proxy" filter (by proxy name) is added to the toolbar. Moesif
+  only knows each call's proxy, not the agent behind it, so the filter says so.
 """
 
 import json
@@ -30,7 +31,7 @@ OUT = ROOT / "src/app/canvas-template.json"
 
 AGENT_FILTER = {
     "id": "agent",
-    "label": "Agent",
+    "label": "LLM proxy",
     "field": "metadata.apiName.raw",
     "op": "contains",
     "type": "autocomplete",

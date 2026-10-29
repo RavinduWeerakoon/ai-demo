@@ -29,7 +29,7 @@
         "editable": [
           {
             "id": "agent",
-            "label": "Agent",
+            "label": "LLM proxy",
             "field": "metadata.apiName.raw",
             "op": "contains",
             "type": "autocomplete",
