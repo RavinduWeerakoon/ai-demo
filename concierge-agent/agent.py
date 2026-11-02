@@ -18,10 +18,13 @@ prompt's.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, timedelta
 from typing import Any
 
+import httpx
 from langchain_core.messages import SystemMessage
+from langchain_core.tools import ToolException
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import ToolNode, create_react_agent
@@ -102,15 +105,85 @@ async def load_mcp_tools(cfg: Config) -> list[Any]:
         connection["headers"] = {"X-API-Key": cfg.mcp_api_key}
 
     client = MultiServerMCPClient({"hotel": connection})
-    return list(await client.get_tools())
+    return [_with_clear_errors(tool) for tool in await client.get_tools()]
+
+
+def _http_status_error(exc: BaseException) -> httpx.HTTPStatusError | None:
+    """Find the HTTP error inside the MCP client's task-group wrapper, if any."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc
+    if isinstance(exc, BaseExceptionGroup):
+        for sub in exc.exceptions:
+            found = _http_status_error(sub)
+            if found is not None:
+                return found
+    if exc.__cause__ is not None:
+        return _http_status_error(exc.__cause__)
+    return None
+
+
+def describe_tool_failure(exc: BaseException) -> str:
+    """A readable reason for a failed tool call.
+
+    The MCP client runs each request in an anyio task group, so an HTTP error
+    from the proxy (a 403 for a tool outside this agent's AgentID scopes)
+    arrives wrapped as "unhandled errors in a TaskGroup (1 sub-exception)".
+    Unwrap it so the model, the logs and the trace see the real status.
+    """
+    http = _http_status_error(exc)
+    if http is None:
+        return str(exc)
+    status = http.response.status_code
+    challenge = http.response.headers.get("www-authenticate", "")
+    scope = re.search(r'scope="([^"]+)"', challenge)
+    needs = f" ({scope.group(1)})" if scope else ""
+    if status == 403:
+        return (
+            "HTTP 403 Forbidden: the MCP proxy refused this tool call; this agent is not "
+            f"granted the scope it needs{needs}"
+        )
+    if status == 401:
+        return "HTTP 401 Unauthorized: the MCP proxy rejected this agent's credentials"
+    return f"HTTP {status} {http.response.reason_phrase} from the MCP server"
+
+
+class ToolCallRefused(Exception):
+    """A tool call the MCP proxy or server refused at the transport level.
+
+    Deliberately not a ``ToolException``: the MCP adapter gives every tool a
+    ``handle_tool_error`` hook that turns a ``ToolException`` into ordinary tool
+    output, so the tool run would finish "successfully" and the trace would show
+    the refused call as green. This type escapes that hook, so the tool span is
+    marked as an error with the readable reason, and ``ToolNode`` still hands
+    the reason to the model through ``_tool_error``.
+    """
+
+
+def _with_clear_errors(tool: Any) -> Any:
+    """Re-raise transport failures with the real reason instead of the task-group wrapper."""
+    call = tool.coroutine
+
+    async def guarded(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return await call(*args, **kwargs)
+        except ToolException:
+            # The MCP server reported an error result (e.g. unknown booking):
+            # keep the adapter's handling, which returns it to the model as output.
+            raise
+        except Exception as exc:  # noqa: BLE001 - ExceptionGroup and HTTP errors alike
+            raise ToolCallRefused(describe_tool_failure(exc)) from exc
+
+    tool.coroutine = guarded
+    return tool
 
 
 def _tool_error(exc: Exception) -> str:
     # A tool the MCP proxy refuses (403 for a missing scope) surfaces here as an
     # exception. Hand it back to the model as the tool result so the agent can
     # explain and offer the front desk, instead of failing the whole chat turn.
-    log.warning("tool call failed: %s", exc)
-    return f"Tool error: {exc}. This action is not available to you; tell the guest and offer the front desk."
+    reason = describe_tool_failure(exc)
+    log.warning("tool call failed: %s", reason)
+    return f"Tool error: {reason}. This action is not available to you; tell the guest and offer the front desk."
 
 
 def build_llm(cfg: Config) -> ChatOpenAI:
