@@ -11,6 +11,8 @@ import { Pool } from "pg";
  * database, so this reads it there, read-only, and turns every proxy and
  * provider into a { label, value } option: the label is what people see (the
  * agent name), the value is what Moesif filters on (the proxy name).
+ * Environment names aren't in Agent Manager's database (they live in
+ * OpenChoreo), so an agent with several proxies is told apart by proxy name.
  *
  * Providers and unattached proxies are listed too, so that with everything
  * pre-selected the dashboard still covers all gateway traffic, including
@@ -25,21 +27,18 @@ type Row = {
   proxy_handle: string;
   agent: string | null;
   project: string | null;
-  environment: string | null;
 };
 
-// One row per proxy/provider, plus one per agent environment that uses it.
+// One row per proxy/provider, plus one per agent configuration that uses it.
 const QUERY = `
   SELECT a.kind,
          a.name   AS proxy_name,
          a.handle AS proxy_handle,
          ac.agent_id     AS agent,
-         ac.project_name AS project,
-         COALESCE(NULLIF(e.display_name, ''), e.name) AS environment
+         ac.project_name AS project
   FROM artifacts a
   LEFT JOIN env_agent_model_mapping m ON m.llm_proxy_uuid = a.uuid
   LEFT JOIN agent_configurations ac ON ac.uuid = m.config_uuid
-  LEFT JOIN environments e ON e.uuid = m.environment_uuid
   WHERE a.kind IN ('LlmProxy', 'LlmProvider')
   ORDER BY ac.agent_id NULLS LAST, a.name`;
 
@@ -78,7 +77,7 @@ export function buildOptions(rows: Row[]): FilterOption[] {
     byValue.set(value, [...(byValue.get(value) ?? []), row]);
   }
 
-  // An agent with proxies in several environments gets the environment in its label.
+  // An agent with several proxies (one per environment) gets the proxy name in its label.
   const proxiesPerAgent = new Map<string, number>();
   for (const group of byValue.values()) {
     const agent = group.find((r) => r.agent)?.agent;
@@ -91,8 +90,8 @@ export function buildOptions(rows: Row[]): FilterOption[] {
     let label: string;
     if (agentRow?.agent) {
       label = agentRow.agent;
-      if ((proxiesPerAgent.get(agentRow.agent) ?? 0) > 1 && agentRow.environment) {
-        label += ` (${agentRow.environment})`;
+      if ((proxiesPerAgent.get(agentRow.agent) ?? 0) > 1) {
+        label += ` (${value})`;
       }
     } else if (group[0].kind === "LlmProvider") {
       label = `${group[0].proxy_name} · direct provider calls`;

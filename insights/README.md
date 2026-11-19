@@ -52,11 +52,11 @@ hash. So the dashboard's **Agent** filter shows agent names as labels while
 filtering on proxy names:
 
 - `src/lib/agent-filter.ts` reads the mapping from Agent Manager's database,
-  read-only (`artifacts` → `env_agent_model_mapping` → `agent_configurations`,
-  plus `environments` for the label). Proxies and providers no agent uses are
-  listed too, labelled `· proxy` / `· direct provider calls`, so nothing drops
-  out of the dashboard. An agent with proxies in several environments gets the
-  environment in its label.
+  read-only (`artifacts` → `env_agent_model_mapping` → `agent_configurations`).
+  Proxies and providers no agent uses are listed too, labelled `· proxy` /
+  `· direct provider calls`, so nothing drops out of the dashboard. An agent
+  with several proxies (one per environment) gets the proxy name in its label:
+  environment names live in OpenChoreo, not in Agent Manager's database.
 - `src/app/api/agent-filter/route.ts` serves those options to signed-in
   sessions only.
 - `canvas-embed.tsx` sends them in `CANVAS_INIT` as the `agent` context filter
@@ -74,7 +74,7 @@ with a password of your own:
 CREATE ROLE insights_ro LOGIN PASSWORD '<password>';
 GRANT CONNECT ON DATABASE agentmanager TO insights_ro;
 GRANT USAGE ON SCHEMA public TO insights_ro;
-GRANT SELECT ON artifacts, environments, agent_configurations, env_agent_model_mapping TO insights_ro;
+GRANT SELECT ON artifacts, agent_configurations, env_agent_model_mapping TO insights_ro;
 ```
 
 Then give it to the site and restart it:
