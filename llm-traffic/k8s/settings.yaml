@@ -1,4 +1,5 @@
-# Non-secret run settings. Provider URLs, keys and models live in the Secret.
+# Non-secret settings: which agents to drive and how. The agents' API keys are
+# in the Secret llm-traffic-agent-keys (see secret.example.yaml).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,8 +8,26 @@ metadata:
     app.kubernetes.io/name: llm-traffic
     app.kubernetes.io/part-of: meridian-demo
 data:
-  TRAFFIC_MIN_PER_PROVIDER: "3"   # conversations per provider per run, picked at random
-  TRAFFIC_MAX_PER_PROVIDER: "8"
+  # The external agents in Agent Manager, each fronting one provider. For every
+  # id, <ID>_* below (hotel-booking -> HOTEL_BOOKING_*). <ID>_URL is the
+  # agent's LLM proxy URL without the API path; the script calls it in the
+  # provider's native format.
+  TRAFFIC_AGENTS: hotel-booking,leave-assistant,room-service
+
+  HOTEL_BOOKING_PROVIDER: openai
+  HOTEL_BOOKING_URL: https://default-default.agents.agent-manager.wso2demos.com/open-ai-b74b243322435f0c-1bac1b12
+  HOTEL_BOOKING_MODELS: gpt-4o-mini
+
+  LEAVE_ASSISTANT_PROVIDER: anthropic
+  LEAVE_ASSISTANT_URL: https://default-default.agents.agent-manager.wso2demos.com/anthropic-0801746ca6b3cd2a-53f8610e
+  LEAVE_ASSISTANT_MODELS: claude-haiku-4-5
+
+  ROOM_SERVICE_PROVIDER: gemini
+  ROOM_SERVICE_URL: https://default-default.agents.agent-manager.wso2demos.com/gemini-daf56e448344be2a-24eeb639
+  ROOM_SERVICE_MODELS: gemini-2.5-flash
+
+  TRAFFIC_MIN_PER_AGENT: "3"      # conversations per agent per run, picked at random
+  TRAFFIC_MAX_PER_AGENT: "8"
   TRAFFIC_MIN_PAUSE_SECONDS: "5"  # random pause between conversations
   TRAFFIC_MAX_PAUSE_SECONDS: "60"
   TRAFFIC_START_JITTER_SECONDS: "3600"  # start up to 1h after the cron time

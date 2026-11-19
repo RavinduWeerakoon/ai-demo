@@ -1,5 +1,5 @@
 # kubectl --context agent-manager-demo apply -k llm-traffic/k8s
-# Create the llm-traffic-providers Secret first (README).
+# Create the llm-traffic-agent-keys Secret first (README).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: meridian-demo
@@ -9,4 +9,4 @@ resources:
 images:
   - name: meridian/llm-traffic
     newName: registry.openchoreo-workflow-plane.svc.cluster.local:5000/meridian/llm-traffic
-    newTag: 0.1.0
+    newTag: 0.2.0

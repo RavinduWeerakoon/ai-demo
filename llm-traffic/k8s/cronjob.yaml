@@ -1,8 +1,8 @@
-# Runs traffic.py once a day: a random set of predefined conversations against
-# the OpenAI, Anthropic and Gemini providers in Agent Manager.
+# Runs traffic.py once a day: a random set of predefined conversations through
+# the demo's external agents in Agent Manager (OpenAI, Anthropic and Gemini).
 #
-# Provider URLs, keys and models come from the Secret "llm-traffic-providers"
-# (see secret.example.yaml and the README). Run settings are in the ConfigMap.
+# Agents and run settings are in the ConfigMap llm-traffic-settings; the
+# agents' API keys are in the Secret llm-traffic-agent-keys (see the README).
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -43,7 +43,7 @@ spec:
                 - configMapRef:
                     name: llm-traffic-settings
                 - secretRef:
-                    name: llm-traffic-providers
+                    name: llm-traffic-agent-keys
               resources:
                 requests:
                   cpu: 20m

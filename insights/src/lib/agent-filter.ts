@@ -3,7 +3,8 @@ import "server-only";
 import { Pool } from "pg";
 
 /**
- * The options for the dashboard's "Agent" filter.
+ * The options for the dashboard's two filters: "Agent" (one entry per agent)
+ * and "LLM proxy" (one entry per proxy or provider).
  *
  * Moesif only knows which LLM proxy or provider each call went through (its
  * `apiName`), and Agent Manager names an agent's proxy after a shortened agent
@@ -20,6 +21,12 @@ import { Pool } from "pg";
  */
 
 export type FilterOption = { label: string; value: string };
+export type FilterOptions = { agents: FilterOption[]; proxies: FilterOption[] };
+
+// The shortest shared proxy-name tail trusted to stand for one agent. Agent
+// Manager ends each proxy name with an agent-specific id ("-1bac1b12-proxy"),
+// so a real tail is about 15 characters; anything shorter is too generic.
+const MIN_AGENT_TAIL = 12;
 
 type Row = {
   kind: string;
@@ -67,7 +74,8 @@ function getPool(): Pool | null {
 const matchOn = (): "proxy_name" | "proxy_handle" =>
   process.env.INSIGHTS_PROXY_MATCH === "handle" ? "proxy_handle" : "proxy_name";
 
-export function buildOptions(rows: Row[]): FilterOption[] {
+/** One option per LLM proxy or provider, labelled with its agent. */
+export function buildProxyOptions(rows: Row[]): FilterOption[] {
   const key = matchOn();
   // Group the agent rows per proxy (one proxy can serve an agent in several environments).
   const byValue = new Map<string, Row[]>();
@@ -107,8 +115,65 @@ export function buildOptions(rows: Row[]): FilterOption[] {
   });
 }
 
-/** Returns the options, or null when the database isn't configured or can't be read. */
-export async function loadAgentFilterOptions(): Promise<FilterOption[] | null> {
+function commonSuffix(values: string[]): string {
+  let suffix = values[0] ?? "";
+  for (const value of values.slice(1)) {
+    let i = 0;
+    while (i < suffix.length && i < value.length && suffix[suffix.length - 1 - i] === value[value.length - 1 - i]) i++;
+    suffix = suffix.slice(suffix.length - i);
+  }
+  return suffix;
+}
+
+/**
+ * One option per agent, so an agent with a proxy in several environments is a
+ * single entry. The filter matches with "contains", so an agent with several
+ * proxies uses the tail its proxy names share, but only when that tail matches
+ * none of the other proxies or providers. Otherwise that agent keeps one entry
+ * per proxy, as in the LLM proxy filter. Providers and unattached proxies are
+ * listed as there, so with everything selected all traffic stays in view.
+ */
+export function buildAgentOptions(rows: Row[]): FilterOption[] {
+  const proxyOptions = buildProxyOptions(rows);
+  const key = matchOn();
+  const allValues = proxyOptions.map((o) => o.value);
+
+  const valuesPerAgent = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const value = row[key];
+    if (row.agent && value) valuesPerAgent.set(row.agent, (valuesPerAgent.get(row.agent) ?? new Set()).add(value));
+  }
+  const agentOf = new Map<string, string>();
+  for (const [agent, values] of valuesPerAgent) for (const value of values) agentOf.set(value, agent);
+
+  const options: FilterOption[] = [];
+  const grouped = new Set<string>();
+  for (const [agent, values] of valuesPerAgent) {
+    const mine = [...values];
+    if (mine.length === 1) {
+      options.push({ label: agent, value: mine[0] });
+      grouped.add(mine[0]);
+      continue;
+    }
+    const tail = commonSuffix(mine);
+    const matchesOnlyMine = allValues.every((v) => !v.includes(tail) || values.has(v));
+    if (tail.length >= MIN_AGENT_TAIL && matchesOnlyMine) {
+      options.push({ label: agent, value: tail });
+      for (const v of mine) grouped.add(v);
+    }
+  }
+  // Agents that couldn't be grouped, plus providers and other proxies, as in the proxy filter.
+  for (const option of proxyOptions) {
+    if (!grouped.has(option.value)) options.push(option);
+  }
+  return options.sort((a, b) => {
+    const rank = (o: FilterOption) => (o.label.includes(" · ") ? 1 : 0);
+    return rank(a) - rank(b) || a.label.localeCompare(b.label);
+  });
+}
+
+/** Returns both filters' options, or null when the database isn't configured or can't be read. */
+export async function loadFilterOptions(): Promise<FilterOptions | null> {
   const db = getPool();
   if (!db) {
     console.warn("[insights] AMP_DB_* not set: the Agent filter falls back to Moesif's unfiltered view");
@@ -116,7 +181,7 @@ export async function loadAgentFilterOptions(): Promise<FilterOption[] | null> {
   }
   try {
     const { rows } = await db.query<Row>(QUERY);
-    return buildOptions(rows);
+    return { agents: buildAgentOptions(rows), proxies: buildProxyOptions(rows) };
   } catch (error) {
     console.error("[insights] could not read the proxy-to-agent mapping:", error);
     return null;

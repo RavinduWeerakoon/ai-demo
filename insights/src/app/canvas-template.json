@@ -35,6 +35,15 @@
             "type": "parentOptions",
             "visibility": "always",
             "multi": true
+          },
+          {
+            "id": "proxy",
+            "label": "LLM proxy",
+            "field": "metadata.apiName.raw",
+            "op": "contains",
+            "type": "parentOptions",
+            "visibility": "always",
+            "multi": true
           }
         ]
       }

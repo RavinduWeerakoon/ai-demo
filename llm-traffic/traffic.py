@@ -1,12 +1,13 @@
 """Daily LLM traffic for the Agent Manager demo.
 
-Replays a random set of predefined conversations against the OpenAI, Anthropic
-and Gemini providers registered in WSO2 Agent Manager, through each provider's
-gateway proxy URL, so the analytics (cost per call, spend by model, model
-affinity, daily tokens) have fresh data every day.
+Replays a random set of predefined conversations through the demo's external
+agents in WSO2 Agent Manager. Each agent fronts one LLM provider (OpenAI,
+Anthropic or Gemini) through its own LLM proxy, and is called in that
+provider's native API format, so the traffic shows up per agent in the
+analytics (cost per call, spend by model, model affinity, daily tokens).
 
-Configuration is all environment variables; see README.md. A provider takes
-part when both its URL and API key are set. Exits non-zero only if every call
+Configuration is all environment variables; see README.md. An agent takes part
+when its URL and API key are set. Exits non-zero only if every conversation
 failed, so a partial outage still shows as a successful run with errors logged.
 """
 
@@ -22,9 +23,12 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from conversations import CONVERSATIONS
+from conversations import AGENT_CONVERSATIONS, GENERAL_CONVERSATIONS
 
-DEFAULT_KEY_HEADER = "X-API-Key"
+# Agent Manager's agent LLM proxies take the agent's key in this header.
+DEFAULT_KEY_HEADER = "api-key"
+PROVIDERS = ("openai", "anthropic", "gemini")
+DEFAULT_AGENTS = "hotel-booking,leave-assistant,room-service"
 DEFAULT_MODELS = {
     "openai": "gpt-4o-mini",
     "anthropic": "claude-haiku-4-5",
@@ -33,12 +37,14 @@ DEFAULT_MODELS = {
 
 
 @dataclass(frozen=True)
-class Provider:
-    name: str  # openai | anthropic | gemini: also selects the request format
-    base_url: str  # the provider's proxy URL in Agent Manager, without the API path
+class Agent:
+    id: str  # e.g. hotel-booking; also picks its conversation pool
+    provider: str  # openai | anthropic | gemini: selects the request format
+    base_url: str  # the agent's LLM proxy URL in Agent Manager, without the API path
     api_key: str
     key_header: str
     models: list[str]
+    conversations: list[dict]
 
 
 def log(event: str, **fields: object) -> None:
@@ -57,43 +63,54 @@ def env_int(name: str, default: int) -> int:
         raise SystemExit(f"{name} must be an integer, got {raw!r}") from None
 
 
-def load_providers() -> list[Provider]:
-    providers = []
-    for name in ("openai", "anthropic", "gemini"):
-        prefix = name.upper()
+def env_prefix(agent_id: str) -> str:
+    """hotel-booking -> HOTEL_BOOKING"""
+    return "".join(c if c.isalnum() else "_" for c in agent_id).upper()
+
+
+def load_agents() -> list[Agent]:
+    """Reads TRAFFIC_AGENTS (comma-separated ids) and each agent's <PREFIX>_* settings."""
+    agents = []
+    for agent_id in [a.strip() for a in os.environ.get("TRAFFIC_AGENTS", DEFAULT_AGENTS).split(",") if a.strip()]:
+        prefix = env_prefix(agent_id)
         url = os.environ.get(f"{prefix}_URL", "").strip().rstrip("/")
         key = os.environ.get(f"{prefix}_API_KEY", "").strip()
+        provider = os.environ.get(f"{prefix}_PROVIDER", "").strip().lower()
         if not url or not key:
-            log("provider_skipped", provider=name, reason=f"{prefix}_URL or {prefix}_API_KEY not set")
+            log("agent_skipped", agent=agent_id, reason=f"{prefix}_URL or {prefix}_API_KEY not set")
             continue
-        models = [m.strip() for m in os.environ.get(f"{prefix}_MODELS", DEFAULT_MODELS[name]).split(",") if m.strip()]
+        if provider not in PROVIDERS:
+            log("agent_skipped", agent=agent_id, reason=f"{prefix}_PROVIDER must be one of {', '.join(PROVIDERS)}")
+            continue
+        models = [m.strip() for m in os.environ.get(f"{prefix}_MODELS", DEFAULT_MODELS[provider]).split(",") if m.strip()]
         header = os.environ.get(f"{prefix}_KEY_HEADER", "").strip() or DEFAULT_KEY_HEADER
-        providers.append(Provider(name, url, key, header, models))
-    return providers
+        pool = AGENT_CONVERSATIONS.get(agent_id, GENERAL_CONVERSATIONS)
+        agents.append(Agent(agent_id, provider, url, key, header, models, pool))
+    return agents
 
 
-# --- Request formats: each provider keeps its native API behind the gateway ---
+# --- Request formats: each agent is called in its provider's native API ---
 
 
-def build_request(provider: Provider, model: str, system: str, history: list[dict], max_tokens: int):
+def build_request(agent: Agent, model: str, system: str, history: list[dict], max_tokens: int):
     """Returns (url, body) for one turn. history holds {"role": "user"|"assistant", "text": ...}."""
-    if provider.name == "openai":
+    if agent.provider == "openai":
         messages = [{"role": "system", "content": system}]
         messages += [{"role": m["role"], "content": m["text"]} for m in history]
-        return f"{provider.base_url}/chat/completions", {
+        return f"{agent.base_url}/chat/completions", {
             "model": model,
             "messages": messages,
             "max_tokens": max_tokens,
         }
-    if provider.name == "anthropic":
-        return f"{provider.base_url}/v1/messages", {
+    if agent.provider == "anthropic":
+        return f"{agent.base_url}/v1/messages", {
             "model": model,
             "system": system,
             "max_tokens": max_tokens,
             "messages": [{"role": m["role"], "content": m["text"]} for m in history],
         }
     # gemini: "assistant" is "model", and the system prompt has its own field.
-    return f"{provider.base_url}/v1beta/models/{model}:generateContent", {
+    return f"{agent.base_url}/v1beta/models/{model}:generateContent", {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": [
             {"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["text"]}]} for m in history
@@ -102,13 +119,13 @@ def build_request(provider: Provider, model: str, system: str, history: list[dic
     }
 
 
-def parse_reply(provider: Provider, data: dict) -> tuple[str, dict]:
-    """Returns (reply text, token usage) from a provider response."""
-    if provider.name == "openai":
+def parse_reply(agent: Agent, data: dict) -> tuple[str, dict]:
+    """Returns (reply text, token usage) from a response in the agent's provider format."""
+    if agent.provider == "openai":
         usage = data.get("usage") or {}
         text = data["choices"][0]["message"].get("content") or ""
         return text, {"input": usage.get("prompt_tokens"), "output": usage.get("completion_tokens")}
-    if provider.name == "anthropic":
+    if agent.provider == "anthropic":
         usage = data.get("usage") or {}
         text = "".join(block.get("text", "") for block in data.get("content", []) if block.get("type") == "text")
         return text, {"input": usage.get("input_tokens"), "output": usage.get("output_tokens")}
@@ -118,39 +135,39 @@ def parse_reply(provider: Provider, data: dict) -> tuple[str, dict]:
     return text, {"input": usage.get("promptTokenCount"), "output": usage.get("candidatesTokenCount")}
 
 
-def call(provider: Provider, url: str, body: dict, timeout: int) -> dict:
-    headers = {"Content-Type": "application/json", provider.key_header: provider.api_key}
-    if provider.name == "anthropic":
+def call(agent: Agent, url: str, body: dict, timeout: int) -> dict:
+    headers = {"Content-Type": "application/json", agent.key_header: agent.api_key}
+    if agent.provider == "anthropic":
         headers["anthropic-version"] = "2023-06-01"
     request = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read())
 
 
-def run_conversation(provider: Provider, conversation: dict, rng: random.Random, settings: dict) -> dict:
-    model = rng.choice(provider.models)
+def run_conversation(agent: Agent, conversation: dict, rng: random.Random, settings: dict) -> dict:
+    model = rng.choice(agent.models)
     history: list[dict] = []
     totals = {"input": 0, "output": 0}
     for turn_number, user_text in enumerate(conversation["turns"], start=1):
         history.append({"role": "user", "text": user_text})
-        url, body = build_request(provider, model, conversation["system"], history, settings["max_tokens"])
+        url, body = build_request(agent, model, conversation["system"], history, settings["max_tokens"])
         started = time.monotonic()
         try:
-            data = call(provider, url, body, settings["timeout"])
-            reply, usage = parse_reply(provider, data)
+            data = call(agent, url, body, settings["timeout"])
+            reply, usage = parse_reply(agent, data)
         except urllib.error.HTTPError as exc:
             detail = exc.read()[:300].decode(errors="replace")
-            log("call_failed", provider=provider.name, model=model, conversation=conversation["id"],
+            log("call_failed", agent=agent.id, provider=agent.provider, model=model, conversation=conversation["id"],
                 turn=turn_number, status=exc.code, detail=detail)
             return {"ok": False}
         except Exception as exc:  # noqa: BLE001 - network errors, timeouts, unexpected bodies
-            log("call_failed", provider=provider.name, model=model, conversation=conversation["id"],
+            log("call_failed", agent=agent.id, provider=agent.provider, model=model, conversation=conversation["id"],
                 turn=turn_number, error=f"{type(exc).__name__}: {exc}")
             return {"ok": False}
         history.append({"role": "assistant", "text": reply})
         for k in totals:
             totals[k] += usage.get(k) or 0
-        log("call_ok", provider=provider.name, model=model, conversation=conversation["id"], turn=turn_number,
+        log("call_ok", agent=agent.id, provider=agent.provider, model=model, conversation=conversation["id"], turn=turn_number,
             latency_ms=int((time.monotonic() - started) * 1000), input_tokens=usage.get("input"),
             output_tokens=usage.get("output"))
     return {"ok": True, **totals}
@@ -160,8 +177,8 @@ def main() -> int:
     seed = os.environ.get("TRAFFIC_SEED", "").strip()
     rng = random.Random(seed or None)
     settings = {
-        "min": env_int("TRAFFIC_MIN_PER_PROVIDER", 3),
-        "max": env_int("TRAFFIC_MAX_PER_PROVIDER", 8),
+        "min": env_int("TRAFFIC_MIN_PER_AGENT", 3),
+        "max": env_int("TRAFFIC_MAX_PER_AGENT", 8),
         "pause_min": env_int("TRAFFIC_MIN_PAUSE_SECONDS", 5),
         "pause_max": env_int("TRAFFIC_MAX_PAUSE_SECONDS", 60),
         "max_tokens": env_int("TRAFFIC_MAX_TOKENS", 300),
@@ -169,23 +186,23 @@ def main() -> int:
         "start_jitter": env_int("TRAFFIC_START_JITTER_SECONDS", 0),
     }
     if not 0 <= settings["min"] <= settings["max"]:
-        raise SystemExit("Need 0 <= TRAFFIC_MIN_PER_PROVIDER <= TRAFFIC_MAX_PER_PROVIDER")
+        raise SystemExit("Need 0 <= TRAFFIC_MIN_PER_AGENT <= TRAFFIC_MAX_PER_AGENT")
     dry_run = os.environ.get("TRAFFIC_DRY_RUN", "").strip().lower() == "true"
 
-    providers = load_providers()
-    if not providers:
-        log("nothing_to_do", reason="no provider has both a URL and an API key")
+    agents = load_agents()
+    if not agents:
+        log("nothing_to_do", reason="no agent has a URL, an API key and a provider")
         return 1
 
-    # A random number of conversations per provider, all shuffled together so
-    # the providers interleave instead of running back to back.
+    # A random number of conversations per agent, each drawn from that agent's
+    # own pool, all shuffled together so the agents interleave.
     plan = []
-    for provider in providers:
+    for agent in agents:
         count = rng.randint(settings["min"], settings["max"])
-        plan += [(provider, rng.choice(CONVERSATIONS)) for _ in range(count)]
+        plan += [(agent, rng.choice(agent.conversations)) for _ in range(count)]
     rng.shuffle(plan)
     log("run_started", seed=seed or None, dry_run=dry_run, planned=len(plan),
-        per_provider={p.name: sum(1 for q, _ in plan if q is p) for p in providers})
+        per_agent={a.id: sum(1 for b, _ in plan if b is a) for a in agents})
 
     # Start at a random point after the cron time, so the traffic doesn't land
     # at exactly the same minute every day.
@@ -196,13 +213,14 @@ def main() -> int:
 
     succeeded = failed = 0
     tokens = {"input": 0, "output": 0}
-    for index, (provider, conversation) in enumerate(plan):
+    for index, (agent, conversation) in enumerate(plan):
         if dry_run:
-            log("planned", provider=provider.name, conversation=conversation["id"], turns=len(conversation["turns"]))
+            log("planned", agent=agent.id, provider=agent.provider, conversation=conversation["id"],
+                turns=len(conversation["turns"]))
             continue
         if index:
             time.sleep(rng.uniform(settings["pause_min"], settings["pause_max"]))
-        result = run_conversation(provider, conversation, rng, settings)
+        result = run_conversation(agent, conversation, rng, settings)
         if result["ok"]:
             succeeded += 1
             tokens["input"] += result["input"]

@@ -44,27 +44,45 @@ Every signed-in visitor can read it in the browser, so give it nothing more.
 See the repo README: build `meridian/insights` for linux/amd64, push it to the
 cluster registry, create the `insights-moesif` Secret, and apply the overlay.
 
-## The Agent filter
+## The Agent and LLM proxy filters
 
 Moesif only knows which LLM proxy each call went through (`metadata.apiName`),
-and Agent Manager names an agent's proxy after a shortened agent name plus a
-hash. So the dashboard's **Agent** filter shows agent names as labels while
-filtering on proxy names:
+and Agent Manager names an agent's proxy after a shortened config name, a hash
+of project/agent/config/environment, and an agent-specific id
+(`open-ai-b74b243322435f0c-1bac1b12-proxy`). An agent configured in two
+environments therefore has two proxies. The dashboard has two filters, both
+matching the proxy name with `contains`:
+
+- **Agent**: one entry per agent. An agent with several proxies is matched on
+  the tail its proxy names share (`-1bac1b12-proxy`), so one entry covers every
+  environment. The tail is used only if it is at least 12 characters and
+  matches none of the other proxies or providers; otherwise that agent keeps
+  one entry per proxy.
+- **LLM proxy**: one entry per proxy, labelled with its agent (plus the proxy
+  name when the agent has several), to look at a single environment.
+
+How it is built:
 
 - `src/lib/agent-filter.ts` reads the mapping from Agent Manager's database,
-  read-only (`artifacts` → `env_agent_model_mapping` → `agent_configurations`).
-  Proxies and providers no agent uses are listed too, labelled `· proxy` /
-  `· direct provider calls`, so nothing drops out of the dashboard. An agent
-  with several proxies (one per environment) gets the proxy name in its label:
-  environment names live in OpenChoreo, not in Agent Manager's database.
-- `src/app/api/agent-filter/route.ts` serves those options to signed-in
-  sessions only.
-- `canvas-embed.tsx` sends them in `CANVAS_INIT` as the `agent` context filter
-  (declared in the template under `filters.context`, type `parentOptions`),
-  with every option pre-selected.
+  read-only (`artifacts` → `env_agent_model_mapping` → `agent_configurations`),
+  and builds both lists. Proxies and providers no agent uses are listed in both,
+  labelled `· proxy` / `· direct provider calls`, so nothing drops out of the
+  dashboard. Environment names live in OpenChoreo, not in Agent Manager's
+  database, so they can't be shown.
+- `src/app/api/agent-filter/route.ts` serves them (`agents`, `proxies`) to
+  signed-in sessions only.
+- `canvas-embed.tsx` sends them in `CANVAS_INIT` as the `agent` and `proxy`
+  context filters (declared in the template under `filters.context`, type
+  `parentOptions`), with every option pre-selected. A filter with no options is
+  left out of the template.
 
-Without database settings, or if the database can't be read, the filter is left
-out and the dashboard shows all traffic unfiltered.
+Because the match is `contains`, a provider entry also matches proxies whose
+names contain the provider's name: `gemini` matches `gemini-…-proxy`. With
+everything selected this changes nothing, but selecting only a provider entry
+also shows that provider's agent proxies.
+
+Without database settings, or if the database can't be read, both filters are
+left out and the dashboard shows all traffic unfiltered.
 
 **A read-only role.** Run once in Agent Manager's database (for example
 `kubectl -n wso2-amp exec -it amp-postgresql-0 -- psql -U agentmanager agentmanager`),

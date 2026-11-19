@@ -3,9 +3,13 @@
 Each conversation is a system prompt plus the user's turns; the model's replies
 are generated live and fed back, so every run is a real multi-turn exchange.
 They vary in length on purpose, so token usage and cost differ per call.
+
+AGENT_CONVERSATIONS holds the conversations that fit each demo agent, keyed by
+the agent id used in TRAFFIC_AGENTS. An agent with no entry of its own draws
+from GENERAL_CONVERSATIONS.
 """
 
-CONVERSATIONS: list[dict] = [
+GENERAL_CONVERSATIONS: list[dict] = [
     {
         "id": "hotel-weekend-stay",
         "system": "You are a concise concierge for The Meridian Colombo, a heritage hotel on Galle Road.",
@@ -101,3 +105,127 @@ CONVERSATIONS: list[dict] = [
         ],
     },
 ]
+
+
+AGENT_CONVERSATIONS: dict[str, list[dict]] = {
+    "hotel-booking": [
+        {
+            "id": "booking-weekend-suite",
+            "system": "You are the booking assistant for The Meridian Colombo. Be concise and confirm details.",
+            "turns": [
+                "Do you have a sea-facing suite for two adults from Friday to Sunday?",
+                "What's included in the rate, and can we check in early?",
+            ],
+        },
+        {
+            "id": "booking-change-dates",
+            "system": "You are the booking assistant for The Meridian Colombo. Be concise and confirm details.",
+            "turns": [
+                "I need to move booking HX-48214 to start two days later. Same room type.",
+                "Will the price change?",
+            ],
+        },
+        {
+            "id": "booking-family",
+            "system": "You are the booking assistant for The Meridian Colombo. Be concise and confirm details.",
+            "turns": [
+                "We're a family of four with two kids under 10. Which rooms fit us for 3 nights in December?",
+            ],
+        },
+        {
+            "id": "booking-cancellation-policy",
+            "system": "You are the booking assistant for The Meridian Colombo. Be concise and confirm details.",
+            "turns": [
+                "What's your cancellation policy for the Heritage Suite?",
+                "If I cancel 5 days before arrival, how much do I get back on a 1,620 USD booking?",
+            ],
+        },
+        {
+            "id": "booking-airport-transfer",
+            "system": "You are the booking assistant for The Meridian Colombo. Be concise and confirm details.",
+            "turns": [
+                "Can you add an airport pickup to my booking? We land at 11:40 pm on the 14th.",
+            ],
+        },
+    ],
+    "leave-assistant": [
+        {
+            "id": "leave-annual-request",
+            "system": "You are an HR leave assistant for hotel staff. Be clear about balances and next steps.",
+            "turns": [
+                "I'd like to take annual leave from the 22nd to the 26th of December.",
+                "How many days will that use, given the 25th is a public holiday?",
+            ],
+        },
+        {
+            "id": "leave-sick-day",
+            "system": "You are an HR leave assistant for hotel staff. Be clear about balances and next steps.",
+            "turns": [
+                "I'm sick today and can't make my morning shift at the front desk. What do I need to do?",
+            ],
+        },
+        {
+            "id": "leave-balance",
+            "system": "You are an HR leave assistant for hotel staff. Be clear about balances and next steps.",
+            "turns": [
+                "How is annual leave usually accrued for full-time staff, and can unused days carry over?",
+                "Summarise that as three bullet points I can share with my team.",
+            ],
+        },
+        {
+            "id": "leave-shift-swap",
+            "system": "You are an HR leave assistant for hotel staff. Be clear about balances and next steps.",
+            "turns": [
+                "Can I swap my Saturday night shift with a colleague instead of taking leave? What approvals are needed?",
+            ],
+        },
+        {
+            "id": "leave-parental",
+            "system": "You are an HR leave assistant for hotel staff. Be clear about balances and next steps.",
+            "turns": [
+                "My partner is due in March. What should I know about planning parental leave?",
+                "Draft a short email to my manager letting them know early.",
+            ],
+        },
+    ],
+    "room-service": [
+        {
+            "id": "room-service-dinner",
+            "system": "You are the in-room dining assistant at The Meridian Colombo. Take orders and confirm them.",
+            "turns": [
+                "Can I order dinner to room 412? Something vegetarian and not too spicy.",
+                "Add a mango lassi and a watalappan for dessert.",
+            ],
+        },
+        {
+            "id": "room-service-breakfast",
+            "system": "You are the in-room dining assistant at The Meridian Colombo. Take orders and confirm them.",
+            "turns": [
+                "I'd like breakfast delivered to room 305 at 7:15 tomorrow: string hoppers, dhal and black coffee.",
+            ],
+        },
+        {
+            "id": "room-service-allergy",
+            "system": "You are the in-room dining assistant at The Meridian Colombo. Take orders and confirm them.",
+            "turns": [
+                "I have a severe peanut allergy. Which dishes on the late-night menu are safe?",
+                "Please order the safest one to room 108 and flag the allergy to the kitchen.",
+            ],
+        },
+        {
+            "id": "room-service-amenities",
+            "system": "You are the in-room dining assistant at The Meridian Colombo. Take orders and confirm them.",
+            "turns": [
+                "Could you send extra towels, two pillows and a kettle to room 501?",
+            ],
+        },
+        {
+            "id": "room-service-celebration",
+            "system": "You are the in-room dining assistant at The Meridian Colombo. Take orders and confirm them.",
+            "turns": [
+                "It's our anniversary. Can you arrange a cake and a bottle of sparkling wine in the room by 8 pm?",
+                "What would that cost in total?",
+            ],
+        },
+    ],
+}

@@ -2,7 +2,7 @@ import { LogOut } from "lucide-react";
 
 import { signOut } from "@/app/login/actions";
 import { AgentManagerLogo } from "@/components/agent-manager-logo";
-import { CanvasEmbed } from "./canvas-embed";
+import { InsightsDashboard } from "./insights-dashboard";
 
 export default function InsightsPage() {
   return (
@@ -34,7 +34,7 @@ export default function InsightsPage() {
             What your agents spend on LLM calls through the AI gateway, by model, agent and day. Data from Moesif.
           </p>
         </div>
-        <CanvasEmbed />
+        <InsightsDashboard />
       </main>
 
       <footer className="border-t border-line bg-paper px-4 py-4 text-sm text-ink-muted backdrop-blur-md sm:px-8">

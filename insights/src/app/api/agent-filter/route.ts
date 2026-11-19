@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
 
-import { loadAgentFilterOptions } from "@/lib/agent-filter";
+import { loadFilterOptions } from "@/lib/agent-filter";
 import { SESSION_COOKIE, isValidSessionToken } from "@/lib/demo-auth";
 
 /**
- * The dashboard's "Agent" filter options: agent names (labels) for the LLM
- * proxy names Moesif filters on (values). Signed-in sessions only, never
- * cached. An empty list means "no mapping available": the page then shows
+ * The dashboard's filter options: "agents" (one entry per agent) and
+ * "proxies" (one per LLM proxy or provider). Labels are agent names, values
+ * are what Moesif matches the proxy name against. Signed-in sessions only,
+ * never cached. Empty lists mean "no mapping available": the page then shows
  * Moesif's unfiltered view instead of a broken filter.
  */
 export async function GET() {
@@ -17,6 +18,6 @@ export async function GET() {
     return Response.json({ error: "Sign in first." }, { status: 401, headers: noStore });
   }
 
-  const options = await loadAgentFilterOptions();
-  return Response.json({ options: options ?? [] }, { headers: noStore });
+  const options = await loadFilterOptions();
+  return Response.json({ agents: options?.agents ?? [], proxies: options?.proxies ?? [] }, { headers: noStore });
 }

@@ -22,30 +22,42 @@ const THEME = {
 
 type Status = "loading" | "ready" | "error";
 type FilterOption = { label: string; value: string };
-
-// The id of the template's "Agent" context filter (dashboards[].filters.context).
-const AGENT_FILTER_ID = "agent";
+type AppliedFilter = { options: FilterOption[]; selected: string[] };
+/**
+ * The filters to start Canvas with, keyed by the ids of the template's context
+ * filters (dashboards[].filters.context): "agent" and "proxy". The page draws
+ * its own controls for them, so Moesif gets the chosen values plus a
+ * visibility for its own copy of the filters (hidden by default).
+ */
+export type AppliedFilters = { agent: AppliedFilter; proxy: AppliedFilter; visibility: string };
 
 /**
- * The template and context to start Canvas with. The Agent filter is a Canvas
+ * The template and context to start Canvas with. Each filter is a Canvas
  * context filter: its options carry a readable label (the agent) and the value
- * Moesif filters on (the LLM proxy name). Everything is pre-selected, since a
- * context filter with no selection would open on one arbitrary option. With
- * no options (mapping unavailable) the filter is dropped from the template and
- * the dashboard shows all traffic unfiltered.
+ * Moesif matches the proxy name against, and the selection is what the page's
+ * own filter controls chose. A filter with no options (mapping unavailable) is
+ * dropped from the template, so the dashboard shows all traffic unfiltered.
  */
-function canvasInit(options: FilterOption[]) {
-  if (options.length > 0) {
-    return {
-      template,
-      context: { [AGENT_FILTER_ID]: { options, value: options.map((o) => o.value) } },
-    };
-  }
-  const unfiltered = {
-    ...template,
-    dashboards: template.dashboards.map((d) => ({ ...d, filters: { ...d.filters, context: [] } })),
+function canvasInit(filters: AppliedFilters | null) {
+  const ids = filters ? (["agent", "proxy"] as const).filter((id) => filters[id].options.length > 0) : [];
+  const context = Object.fromEntries(
+    ids.map((id) => [id, { options: filters![id].options, value: filters![id].selected }]),
+  );
+  return {
+    template: {
+      ...template,
+      dashboards: template.dashboards.map((d) => ({
+        ...d,
+        filters: {
+          ...d.filters,
+          context: d.filters.context
+            .filter((f) => (ids as readonly string[]).includes(f.id))
+            .map((f) => ({ ...f, visibility: filters?.visibility ?? f.visibility })),
+        },
+      })),
+    },
+    context,
   };
-  return { template: unfiltered, context: {} };
 }
 
 /**
@@ -60,7 +72,7 @@ function canvasInit(options: FilterOption[]) {
  * route, so the frame is shown once the template is sent (each card has its
  * own loading state) and starts tall enough for the whole dashboard.
  */
-export function CanvasEmbed() {
+export function CanvasEmbed({ filters }: { filters: AppliedFilters | null }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -83,12 +95,6 @@ export function CanvasEmbed() {
     });
     tokenRequest.catch((err: unknown) => fail(err instanceof Error ? err.message : "Could not load the analytics key."));
 
-    // The Agent filter's options (agent name -> LLM proxy name). Any failure
-    // just leaves the filter out, so the dashboard still loads unfiltered.
-    const optionsRequest = fetch("/api/agent-filter", { cache: "no-store" })
-      .then(async (res) => (res.ok ? ((await res.json()) as { options?: FilterOption[] }).options ?? [] : []))
-      .catch(() => [] as FilterOption[]);
-
     const timeout = window.setTimeout(
       () => fail("Moesif didn't respond. Reload the page to try again."),
       30_000,
@@ -109,10 +115,8 @@ export function CanvasEmbed() {
     async function start(target: Window) {
       const token = await tokenRequest.catch(() => null);
       if (!token || cancelled) return;
-      const options = await optionsRequest;
-      if (cancelled) return;
       target.postMessage({ type: "SET_TOKEN", token }, MOESIF_ORIGIN);
-      target.postMessage({ type: "CANVAS_INIT", ...canvasInit(options), theme: THEME }, MOESIF_ORIGIN);
+      target.postMessage({ type: "CANVAS_INIT", ...canvasInit(filters), theme: THEME }, MOESIF_ORIGIN);
       window.clearTimeout(timeout);
       setStatus("ready");
     }
@@ -142,6 +146,9 @@ export function CanvasEmbed() {
       window.clearInterval(offer);
       window.removeEventListener("message", onMessage);
     };
+    // The page remounts this component (new key) to apply a new selection, so
+    // the filters are read once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
