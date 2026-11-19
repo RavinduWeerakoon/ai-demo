@@ -46,40 +46,45 @@ cluster registry, create the `insights-moesif` Secret, and apply the overlay.
 
 ## The Agent and LLM proxy filters
 
-Moesif only knows which LLM proxy each call went through (`metadata.apiName`),
-and Agent Manager names an agent's proxy after a shortened config name, a hash
-of project/agent/config/environment, and an agent-specific id
-(`open-ai-b74b243322435f0c-1bac1b12-proxy`). An agent configured in two
-environments therefore has two proxies. The dashboard has two filters, both
-matching the proxy name with `contains`:
+The filter bar above the dashboard is drawn by this app, not by Moesif:
 
-- **Agent**: one entry per agent. An agent with several proxies is matched on
-  the tail its proxy names share (`-1bac1b12-proxy`), so one entry covers every
-  environment. The tail is used only if it is at least 12 characters and
-  matches none of the other proxies or providers; otherwise that agent keeps
-  one entry per proxy.
-- **LLM proxy**: one entry per proxy, labelled with its agent (plus the proxy
-  name when the agent has several), to look at a single environment.
+- **Agent**: one entry per agent. An agent configured in several environments
+  has one LLM proxy per environment, and its entry covers all of them. Only
+  agents are listed: proxies with no agent (an evaluation monitor's LLM-judge
+  proxy, labelled `· evaluation monitor`) and direct provider calls appear only
+  under LLM proxy.
+- **LLM proxy**: the proxies of the chosen agents, labelled with their agent.
+  With every agent chosen it lists everything, direct provider calls included.
+
+Choices take effect on **Apply**, which reloads the Moesif dashboard with them
+(Canvas has no documented way to change a filter after it loads). **Reset**
+selects everything again.
+
+Moesif only knows which proxy each call went through (`metadata.apiName`), and
+it matches the filter's values **exactly**, whatever the template's `op` says.
+So only one filter is sent to Moesif: `proxy`, with the exact names of the
+chosen proxies; the agent choice is turned into those names here. With every
+proxy selected nothing is sent, so the default view shows all traffic.
 
 How it is built:
 
 - `src/lib/agent-filter.ts` reads the mapping from Agent Manager's database,
-  read-only (`artifacts` → `env_agent_model_mapping` → `agent_configurations`),
-  and builds both lists. Proxies and providers no agent uses are listed in both,
-  labelled `· proxy` / `· direct provider calls`, so nothing drops out of the
-  dashboard. Environment names live in OpenChoreo, not in Agent Manager's
+  read-only (`artifacts` → `env_agent_model_mapping` → `agent_configurations`):
+  the agents with the exact names of their proxies, and every proxy and
+  provider. Environment names live in OpenChoreo, not in Agent Manager's
   database, so they can't be shown.
 - `src/app/api/agent-filter/route.ts` serves them (`agents`, `proxies`) to
   signed-in sessions only.
-- `canvas-embed.tsx` sends them in `CANVAS_INIT` as the `agent` and `proxy`
-  context filters (declared in the template under `filters.context`, type
-  `parentOptions`), with every option pre-selected. A filter with no options is
-  left out of the template.
+- `src/app/insights-dashboard.tsx` draws the two controls
+  (`src/components/multi-select.tsx`) and remounts the embed on Apply.
+- `canvas-embed.tsx` sends the chosen proxy names in `CANVAS_INIT` as the
+  `proxy` context filter (declared in the template under `filters.context`,
+  type `parentOptions`), with `visibility` set to `hidden`. Override it with
+  `?filterVisibility=<value>` in the page URL.
 
-Because the match is `contains`, a provider entry also matches proxies whose
-names contain the provider's name: `gemini` matches `gemini-…-proxy`. With
-everything selected this changes nothing, but selecting only a provider entry
-also shows that provider's agent proxies.
+Moesif may still show its own Filters button once a filter is sent: it runs on
+moesif.com in an iframe, so this page's CSS can't reach it, and Canvas has no
+documented setting to hide it.
 
 Without database settings, or if the database can't be read, both filters are
 left out and the dashboard shows all traffic unfiltered.

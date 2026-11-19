@@ -6,24 +6,26 @@ import { RotateCcw } from "lucide-react";
 import { MultiSelect, type Option } from "@/components/multi-select";
 import { CanvasEmbed, type AppliedFilters } from "./canvas-embed";
 
-type FilterData = { agents: Option[]; proxies: Option[] };
+type AgentOption = Option & { proxies: string[] };
+type FilterData = { agents: AgentOption[]; proxies: Option[] };
 
-// Moesif's own copy of the filters is hidden by default, since the page draws
+// Moesif's own copy of the filter is hidden by default, since the page draws
 // its own. Canvas's accepted values aren't documented, so ?filterVisibility=
-// overrides it (e.g. "always" to bring Moesif's Filters panel back).
+// overrides it (e.g. "always").
 function filterVisibility(): string {
   const value = new URLSearchParams(window.location.search).get("filterVisibility")?.trim();
   return value && /^[a-z]{1,20}$/i.test(value) ? value : "hidden";
 }
 
-// A proxy belongs to an agent option when it contains that option's value
-// (the agent's shared proxy-name tail, or the proxy name itself).
-const belongsTo = (proxy: string, agentValues: string[]) => agentValues.some((a) => proxy.includes(a));
-
 /**
  * The Agent and LLM proxy filters, drawn here above the Moesif dashboard.
- * Choices take effect on Apply, which reloads the dashboard with them: Canvas
- * has no documented way to change a filter once it has loaded.
+ *
+ * Moesif matches proxy names exactly, so only one filter is sent to it: the
+ * exact names of the chosen proxies. The Agent choice decides which proxies
+ * are on offer (each agent lists its own), and with every agent chosen the
+ * list also offers direct provider calls. Choices take effect on Apply, which
+ * reloads the dashboard: Canvas has no documented way to change a filter once
+ * it has loaded.
  */
 export function InsightsDashboard() {
   const [data, setData] = useState<FilterData | null>(null);
@@ -42,33 +44,35 @@ export function InsightsDashboard() {
       .then((body) => {
         if (cancelled) return;
         const loaded = { agents: body.agents ?? [], proxies: body.proxies ?? [] };
-        const allAgents = loaded.agents.map((o) => o.value);
         const allProxies = loaded.proxies.map((o) => o.value);
         setData(loaded);
-        setAgents(allAgents);
+        setAgents(loaded.agents.map((o) => o.value));
         setProxies(allProxies);
-        setApplied(toApplied(loaded, allAgents, allProxies));
+        setApplied(toApplied(loaded, allProxies));
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // The LLM proxy list only offers proxies of the chosen agents.
-  const proxyOptions = useMemo(
-    () => (data ? data.proxies.filter((p) => belongsTo(p.value, agents)) : []),
-    [data, agents],
-  );
+  // The proxies on offer for an agent choice: everything when every agent is
+  // chosen (direct provider calls included), otherwise the chosen agents' own.
+  function proxiesFor(source: FilterData, agentValues: string[]): Option[] {
+    if (agentValues.length === source.agents.length) return source.proxies;
+    const chosen = new Set(source.agents.filter((a) => agentValues.includes(a.value)).flatMap((a) => a.proxies));
+    return source.proxies.filter((p) => chosen.has(p.value));
+  }
+
+  const proxyOptions = useMemo(() => (data ? proxiesFor(data, agents) : []), [data, agents]);
 
   function chooseAgents(values: string[]) {
     setAgents(values);
     // A new agent choice starts with all of those agents' proxies selected.
-    setProxies((data?.proxies ?? []).filter((p) => belongsTo(p.value, values)).map((p) => p.value));
+    if (data) setProxies(proxiesFor(data, values).map((p) => p.value));
   }
 
-  function toApplied(source: FilterData, agentValues: string[], proxyValues: string[]): AppliedFilters {
+  function toApplied(source: FilterData, proxyValues: string[]): AppliedFilters {
     return {
-      agent: { options: source.agents, selected: agentValues },
       proxy: { options: source.proxies, selected: proxyValues },
       visibility: filterVisibility(),
     };
@@ -76,23 +80,21 @@ export function InsightsDashboard() {
 
   function apply() {
     if (!data) return;
-    setApplied(toApplied(data, agents, proxies));
+    setApplied(toApplied(data, proxies));
     setRevision((r) => r + 1); // new key: a fresh dashboard with these filters
   }
 
   function reset() {
     if (!data) return;
-    const allAgents = data.agents.map((o) => o.value);
     const allProxies = data.proxies.map((o) => o.value);
-    setAgents(allAgents);
+    setAgents(data.agents.map((o) => o.value));
     setProxies(allProxies);
-    setApplied(toApplied(data, allAgents, allProxies));
+    setApplied(toApplied(data, allProxies));
     setRevision((r) => r + 1);
   }
 
-  const hasFilters = !!data && data.agents.length > 0;
-  const changed =
-    !!applied && (applied.agent.selected.join("\n") !== agents.join("\n") || applied.proxy.selected.join("\n") !== proxies.join("\n"));
+  const hasFilters = !!data && data.proxies.length > 0;
+  const changed = !!applied && applied.proxy.selected.join("\n") !== proxies.join("\n");
   const empty = agents.length === 0 || proxies.length === 0;
 
   return (
@@ -124,7 +126,7 @@ export function InsightsDashboard() {
         </div>
       )}
 
-      {/* Waits for the options, so the dashboard starts with the right filters. */}
+      {/* Waits for the options, so the dashboard starts with the right filter. */}
       {data && <CanvasEmbed key={revision} filters={hasFilters ? applied : null} />}
     </div>
   );

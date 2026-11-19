@@ -3,8 +3,10 @@ import "server-only";
 import { Pool } from "pg";
 
 /**
- * The options for the dashboard's two filters: "Agent" (one entry per agent)
- * and "LLM proxy" (one entry per proxy or provider).
+ * The options for the dashboard's two filter controls: "Agent" (one entry per
+ * agent, with the exact names of its proxies) and "LLM proxy" (one entry per
+ * proxy or provider). Moesif matches proxy names exactly, so the page turns an
+ * agent choice into the exact names of that agent's proxies before filtering.
  *
  * Moesif only knows which LLM proxy or provider each call went through (its
  * `apiName`), and Agent Manager names an agent's proxy after a shortened agent
@@ -21,12 +23,14 @@ import { Pool } from "pg";
  */
 
 export type FilterOption = { label: string; value: string };
-export type FilterOptions = { agents: FilterOption[]; proxies: FilterOption[] };
+/** An agent and the exact names (the values Moesif matches) of its LLM proxies. */
+export type AgentOption = FilterOption & { proxies: string[] };
+export type FilterOptions = { agents: AgentOption[]; proxies: FilterOption[] };
 
-// The shortest shared proxy-name tail trusted to stand for one agent. Agent
-// Manager ends each proxy name with an agent-specific id ("-1bac1b12-proxy"),
-// so a real tail is about 15 characters; anything shorter is too generic.
-const MIN_AGENT_TAIL = 12;
+// An evaluation monitor's LLM-judge proxy, as Agent Manager names it
+// (monitorProxyName): up to 4 characters of the monitor name, an 8-hex provider
+// fingerprint, the monitor's dashless UUID, then "-proxy".
+const MONITOR_PROXY = /^[a-z0-9-]{1,4}-[0-9a-f]{8}-[0-9a-f]{32}-proxy$/;
 
 type Row = {
   kind: string;
@@ -103,6 +107,8 @@ export function buildProxyOptions(rows: Row[]): FilterOption[] {
       }
     } else if (group[0].kind === "LlmProvider") {
       label = `${group[0].proxy_name} · direct provider calls`;
+    } else if (MONITOR_PROXY.test(group[0].proxy_name)) {
+      label = `${group[0].proxy_name} · evaluation monitor`;
     } else {
       label = `${group[0].proxy_name} · proxy`;
     }
@@ -115,61 +121,27 @@ export function buildProxyOptions(rows: Row[]): FilterOption[] {
   });
 }
 
-function commonSuffix(values: string[]): string {
-  let suffix = values[0] ?? "";
-  for (const value of values.slice(1)) {
-    let i = 0;
-    while (i < suffix.length && i < value.length && suffix[suffix.length - 1 - i] === value[value.length - 1 - i]) i++;
-    suffix = suffix.slice(suffix.length - i);
-  }
-  return suffix;
-}
-
 /**
  * One option per agent, so an agent with a proxy in several environments is a
- * single entry. The filter matches with "contains", so an agent with several
- * proxies uses the tail its proxy names share, but only when that tail matches
- * none of the other proxies or providers. Otherwise that agent keeps one entry
- * per proxy, as in the LLM proxy filter. Providers and unattached proxies are
- * listed as there, so with everything selected all traffic stays in view.
+ * single entry. Each carries the exact names of its proxies, read from the
+ * same mapping, which the page sends to Moesif as the proxy filter. Only
+ * agents are listed: proxies with no agent (such as evaluation monitors' judge
+ * proxies) and direct provider calls are only in the LLM proxy filter.
+ * (Nothing is sent to Moesif while everything is selected, so that view
+ * includes them.)
  */
-export function buildAgentOptions(rows: Row[]): FilterOption[] {
-  const proxyOptions = buildProxyOptions(rows);
+export function buildAgentOptions(rows: Row[]): AgentOption[] {
   const key = matchOn();
-  const allValues = proxyOptions.map((o) => o.value);
-
-  const valuesPerAgent = new Map<string, Set<string>>();
+  const byAgent = new Map<string, Set<string>>();
   for (const row of rows) {
     const value = row[key];
-    if (row.agent && value) valuesPerAgent.set(row.agent, (valuesPerAgent.get(row.agent) ?? new Set()).add(value));
-  }
-  const agentOf = new Map<string, string>();
-  for (const [agent, values] of valuesPerAgent) for (const value of values) agentOf.set(value, agent);
-
-  const options: FilterOption[] = [];
-  const grouped = new Set<string>();
-  for (const [agent, values] of valuesPerAgent) {
-    const mine = [...values];
-    if (mine.length === 1) {
-      options.push({ label: agent, value: mine[0] });
-      grouped.add(mine[0]);
-      continue;
-    }
-    const tail = commonSuffix(mine);
-    const matchesOnlyMine = allValues.every((v) => !v.includes(tail) || values.has(v));
-    if (tail.length >= MIN_AGENT_TAIL && matchesOnlyMine) {
-      options.push({ label: agent, value: tail });
-      for (const v of mine) grouped.add(v);
+    if (value && row.agent && row.kind !== "LlmProvider") {
+      byAgent.set(row.agent, (byAgent.get(row.agent) ?? new Set()).add(value));
     }
   }
-  // Agents that couldn't be grouped, plus providers and other proxies, as in the proxy filter.
-  for (const option of proxyOptions) {
-    if (!grouped.has(option.value)) options.push(option);
-  }
-  return options.sort((a, b) => {
-    const rank = (o: FilterOption) => (o.label.includes(" · ") ? 1 : 0);
-    return rank(a) - rank(b) || a.label.localeCompare(b.label);
-  });
+  return [...byAgent]
+    .map(([agent, values]) => ({ label: agent, value: agent, proxies: [...values].sort() }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /** Returns both filters' options, or null when the database isn't configured or can't be read. */

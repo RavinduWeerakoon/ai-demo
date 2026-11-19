@@ -31,17 +31,17 @@ ROOT = Path(__file__).resolve().parent.parent
 LAYOUT = ROOT / "dashboard-layout.json"
 OUT = ROOT / "src/app/canvas-template.json"
 
-AGENT_FILTER = {
-    "id": "agent",
-    "label": "Agent",
+# The LLM proxy filter. Moesif matches its values exactly; the page draws its
+# own Agent and LLM proxy controls and sends the chosen proxy names here.
+PROXY_FILTER = {
+    "id": "proxy",
+    "label": "LLM proxy",
     "field": "metadata.apiName.raw",
     "op": "contains",
     "type": "parentOptions",
     "visibility": "always",
     "multi": True,
 }
-# The same traffic, one entry per LLM proxy (an agent has one per environment).
-PROXY_FILTER = {**AGENT_FILTER, "id": "proxy", "label": "LLM proxy"}
 PLACEHOLDER_NAME = re.compile(r"^Metric [a-z]$")
 
 
@@ -117,7 +117,7 @@ def main() -> None:
     dashboard["name"] = layout.get("title", dashboard["name"])
     dashboard["workspace_ids"] = rows
     dashboard["dashboard_ids"] = []
-    dashboard["filters"] = {"context": [AGENT_FILTER, PROXY_FILTER]}
+    dashboard["filters"] = {"context": [PROXY_FILTER]}
 
     wide = set(layout.get("wide", []))
     tooltips = layout.get("tooltips", {})

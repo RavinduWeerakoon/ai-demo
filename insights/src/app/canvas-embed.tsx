@@ -24,25 +24,23 @@ type Status = "loading" | "ready" | "error";
 type FilterOption = { label: string; value: string };
 type AppliedFilter = { options: FilterOption[]; selected: string[] };
 /**
- * The filters to start Canvas with, keyed by the ids of the template's context
- * filters (dashboards[].filters.context): "agent" and "proxy". The page draws
- * its own controls for them, so Moesif gets the chosen values plus a
- * visibility for its own copy of the filters (hidden by default).
+ * The filter to start Canvas with: the template's "proxy" context filter
+ * (dashboards[].filters.context), with the exact proxy names the page's own
+ * controls chose, plus a visibility for Moesif's own copy of it.
  */
-export type AppliedFilters = { agent: AppliedFilter; proxy: AppliedFilter; visibility: string };
+export type AppliedFilters = { proxy: AppliedFilter; visibility: string };
 
 /**
- * The template and context to start Canvas with. Each filter is a Canvas
- * context filter: its options carry a readable label (the agent) and the value
- * Moesif matches the proxy name against, and the selection is what the page's
- * own filter controls chose. A filter with no options (mapping unavailable) is
- * dropped from the template, so the dashboard shows all traffic unfiltered.
+ * The template and context to start Canvas with. Only the proxy filter is
+ * sent: Moesif matches its values exactly, and the page has already turned
+ * any agent choice into that agent's proxy names. The filter is sent only
+ * once it is narrowed; with every proxy (or nothing usable) selected, every
+ * context filter is dropped from the template, so that view covers all
+ * traffic and Moesif has no filter of its own to show.
  */
 function canvasInit(filters: AppliedFilters | null) {
-  const ids = filters ? (["agent", "proxy"] as const).filter((id) => filters[id].options.length > 0) : [];
-  const context = Object.fromEntries(
-    ids.map((id) => [id, { options: filters![id].options, value: filters![id].selected }]),
-  );
+  const proxy = filters?.proxy;
+  const narrowed = !!proxy && proxy.selected.length > 0 && proxy.selected.length < proxy.options.length;
   return {
     template: {
       ...template,
@@ -50,13 +48,15 @@ function canvasInit(filters: AppliedFilters | null) {
         ...d,
         filters: {
           ...d.filters,
-          context: d.filters.context
-            .filter((f) => (ids as readonly string[]).includes(f.id))
-            .map((f) => ({ ...f, visibility: filters?.visibility ?? f.visibility })),
+          context: narrowed
+            ? d.filters.context
+                .filter((f) => f.id === "proxy")
+                .map((f) => ({ ...f, visibility: filters!.visibility }))
+            : [],
         },
       })),
     },
-    context,
+    context: narrowed ? { proxy: { options: proxy!.options, value: proxy!.selected } } : {},
   };
 }
 
