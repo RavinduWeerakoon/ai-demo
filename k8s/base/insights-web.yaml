@@ -52,6 +52,28 @@ spec:
                   name: insights-moesif
                   key: MOESIF_CANVAS_KEY
                   optional: true
+            # Agent Manager's database, read for the proxy-to-agent mapping
+            # behind the "Agent" filter. Use a read-only role (see README).
+            # Without the Secret the filter is left out and the dashboard
+            # shows all traffic unfiltered.
+            - name: AMP_DB_HOST
+              value: amp-postgresql.wso2-amp.svc.cluster.local
+            - name: AMP_DB_PORT
+              value: "5432"
+            - name: AMP_DB_NAME
+              value: agentmanager
+            - name: AMP_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: insights-amp-db
+                  key: AMP_DB_USER
+                  optional: true
+            - name: AMP_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: insights-amp-db
+                  key: AMP_DB_PASSWORD
+                  optional: true
           readinessProbe:
             httpGet:
               path: /login

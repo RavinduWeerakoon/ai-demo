@@ -21,6 +21,32 @@ const THEME = {
 };
 
 type Status = "loading" | "ready" | "error";
+type FilterOption = { label: string; value: string };
+
+// The id of the template's "Agent" context filter (dashboards[].filters.context).
+const AGENT_FILTER_ID = "agent";
+
+/**
+ * The template and context to start Canvas with. The Agent filter is a Canvas
+ * context filter: its options carry a readable label (the agent) and the value
+ * Moesif filters on (the LLM proxy name). Everything is pre-selected, since a
+ * context filter with no selection would open on one arbitrary option. With
+ * no options (mapping unavailable) the filter is dropped from the template and
+ * the dashboard shows all traffic unfiltered.
+ */
+function canvasInit(options: FilterOption[]) {
+  if (options.length > 0) {
+    return {
+      template,
+      context: { [AGENT_FILTER_ID]: { options, value: options.map((o) => o.value) } },
+    };
+  }
+  const unfiltered = {
+    ...template,
+    dashboards: template.dashboards.map((d) => ({ ...d, filters: { ...d.filters, context: [] } })),
+  };
+  return { template: unfiltered, context: {} };
+}
 
 /**
  * Moesif Canvas in an iframe, authenticated with a management API key.
@@ -57,6 +83,12 @@ export function CanvasEmbed() {
     });
     tokenRequest.catch((err: unknown) => fail(err instanceof Error ? err.message : "Could not load the analytics key."));
 
+    // The Agent filter's options (agent name -> LLM proxy name). Any failure
+    // just leaves the filter out, so the dashboard still loads unfiltered.
+    const optionsRequest = fetch("/api/agent-filter", { cache: "no-store" })
+      .then(async (res) => (res.ok ? ((await res.json()) as { options?: FilterOption[] }).options ?? [] : []))
+      .catch(() => [] as FilterOption[]);
+
     const timeout = window.setTimeout(
       () => fail("Moesif didn't respond. Reload the page to try again."),
       30_000,
@@ -77,8 +109,10 @@ export function CanvasEmbed() {
     async function start(target: Window) {
       const token = await tokenRequest.catch(() => null);
       if (!token || cancelled) return;
+      const options = await optionsRequest;
+      if (cancelled) return;
       target.postMessage({ type: "SET_TOKEN", token }, MOESIF_ORIGIN);
-      target.postMessage({ type: "CANVAS_INIT", template, theme: THEME, context: {} }, MOESIF_ORIGIN);
+      target.postMessage({ type: "CANVAS_INIT", ...canvasInit(options), theme: THEME }, MOESIF_ORIGIN);
       window.clearTimeout(timeout);
       setStatus("ready");
     }

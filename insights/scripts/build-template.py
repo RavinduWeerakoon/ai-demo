@@ -16,8 +16,10 @@ so a fresh export never loses it, and it works with anyone's Moesif dashboard:
 - Tooltips come from "tooltips", keyed by chart name.
 - Moesif's placeholder metric names ("Metric a") become readable labels from
   "metricLabels", keyed by the end of the field name.
-- An "LLM proxy" filter (by proxy name) is added to the toolbar. Moesif
-  only knows each call's proxy, not the agent behind it, so the filter says so.
+- An "Agent" filter is added as a Canvas *context* filter on the proxy name.
+  Its options (agent name as the label, proxy name as the value) are not in
+  the template: the page reads them from Agent Manager's database and sends
+  them with CANVAS_INIT (see src/lib/agent-filter.ts).
 """
 
 import json
@@ -31,12 +33,12 @@ OUT = ROOT / "src/app/canvas-template.json"
 
 AGENT_FILTER = {
     "id": "agent",
-    "label": "LLM proxy",
+    "label": "Agent",
     "field": "metadata.apiName.raw",
     "op": "contains",
-    "type": "autocomplete",
+    "type": "parentOptions",
+    "visibility": "always",
     "multi": True,
-    "default": None,
 }
 PLACEHOLDER_NAME = re.compile(r"^Metric [a-z]$")
 
@@ -113,7 +115,7 @@ def main() -> None:
     dashboard["name"] = layout.get("title", dashboard["name"])
     dashboard["workspace_ids"] = rows
     dashboard["dashboard_ids"] = []
-    dashboard["filters"] = {"editable": [AGENT_FILTER]}
+    dashboard["filters"] = {"context": [AGENT_FILTER]}
 
     wide = set(layout.get("wide", []))
     tooltips = layout.get("tooltips", {})

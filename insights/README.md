@@ -43,3 +43,49 @@ Every signed-in visitor can read it in the browser, so give it nothing more.
 
 See the repo README: build `meridian/insights` for linux/amd64, push it to the
 cluster registry, create the `insights-moesif` Secret, and apply the overlay.
+
+## The Agent filter
+
+Moesif only knows which LLM proxy each call went through (`metadata.apiName`),
+and Agent Manager names an agent's proxy after a shortened agent name plus a
+hash. So the dashboard's **Agent** filter shows agent names as labels while
+filtering on proxy names:
+
+- `src/lib/agent-filter.ts` reads the mapping from Agent Manager's database,
+  read-only (`artifacts` → `env_agent_model_mapping` → `agent_configurations`,
+  plus `environments` for the label). Proxies and providers no agent uses are
+  listed too, labelled `· proxy` / `· direct provider calls`, so nothing drops
+  out of the dashboard. An agent with proxies in several environments gets the
+  environment in its label.
+- `src/app/api/agent-filter/route.ts` serves those options to signed-in
+  sessions only.
+- `canvas-embed.tsx` sends them in `CANVAS_INIT` as the `agent` context filter
+  (declared in the template under `filters.context`, type `parentOptions`),
+  with every option pre-selected.
+
+Without database settings, or if the database can't be read, the filter is left
+out and the dashboard shows all traffic unfiltered.
+
+**A read-only role.** Run once in Agent Manager's database (for example
+`kubectl -n wso2-amp exec -it amp-postgresql-0 -- psql -U agentmanager agentmanager`),
+with a password of your own:
+
+```sql
+CREATE ROLE insights_ro LOGIN PASSWORD '<password>';
+GRANT CONNECT ON DATABASE agentmanager TO insights_ro;
+GRANT USAGE ON SCHEMA public TO insights_ro;
+GRANT SELECT ON artifacts, environments, agent_configurations, env_agent_model_mapping TO insights_ro;
+```
+
+Then give it to the site and restart it:
+
+```bash
+kubectl --context agent-manager-demo -n meridian-demo create secret generic insights-amp-db --from-literal=AMP_DB_USER=insights_ro --from-literal=AMP_DB_PASSWORD='<password>'
+kubectl --context agent-manager-demo -n meridian-demo rollout restart deploy/insights-web
+```
+
+The app also opens every session with `default_transaction_read_only=on`, so it
+cannot write even if given a broader role.
+
+If the filter shows agents but the charts go empty, Moesif's `apiName` carries
+the proxy **handle** rather than its name: set `INSIGHTS_PROXY_MATCH=handle`.

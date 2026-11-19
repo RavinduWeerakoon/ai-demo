@@ -26,15 +26,15 @@
       "parent": null,
       "sort_order": 3,
       "filters": {
-        "editable": [
+        "context": [
           {
             "id": "agent",
-            "label": "LLM proxy",
+            "label": "Agent",
             "field": "metadata.apiName.raw",
             "op": "contains",
-            "type": "autocomplete",
-            "multi": true,
-            "default": null
+            "type": "parentOptions",
+            "visibility": "always",
+            "multi": true
           }
         ]
       }
